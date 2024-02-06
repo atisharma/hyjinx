@@ -9,6 +9,7 @@ Convenience things for ndarrays, matrices and numerical data.
         cytoolz [last])
 
 (import numpy)
+(import random [randint])
 (import shutil)
 (import operator)
 
@@ -41,13 +42,12 @@ Convenience things for ndarrays, matrices and numerical data.
         (print :end "│\n"))
     (print f"{"──╯" :>{(- s-width 2)}}")))
 
-
 ;; * Numeric
 ;; ----------------------------------------------------
 
 (defn dice [n]
   "True 1/n of the time."
-  (not (numpy.random.randint 0 n)))
+  (not (randint 0 (- n 1))))
 
 (defn prod [l]
   (reduce operator.mul l))
