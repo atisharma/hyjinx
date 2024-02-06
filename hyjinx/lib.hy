@@ -1,5 +1,5 @@
 (require hyrule [unless -> ->> as->]
-         hyperspace.macros *)
+         hyjinx.macros *)
 
 (import functools *
         itertools *

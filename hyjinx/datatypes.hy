@@ -12,7 +12,7 @@ data-matrix       A matrix with times aligned to columns and each row correspond
 """
 
 (require hyrule [unless -> ->> as->]
-         hyperspace.macros *)
+         hyjinx.macros *)
 
 (import collections [UserList UserDict])
 (import cytoolz [first])

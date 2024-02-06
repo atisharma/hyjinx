@@ -12,7 +12,7 @@
 
 (setv sender-id (. (uuid1) hex))
 
-(setv HYPERSPACE_PROTOCOL_VERSION "0.0.2")
+(setv HYJINX_PROTOCOL_VERSION "0.0.2")
 
 (setv keys (crypto.keys (config "passphrase"))
       priv-key (:private keys)
@@ -23,7 +23,7 @@
   (let [t (time)
         payload-hash (hash-id (+ (str t) (str payload)))]
     (-> (json.dumps {"payload" payload
-                     "proto_version" HYPERSPACE_PROTOCOL_VERSION
+                     "proto_version" HYJINX_PROTOCOL_VERSION
                      "zmq_version" zmq.__version__
                      "sender_id" sender-id
                      "sender_time" t

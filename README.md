@@ -1,4 +1,4 @@
-## oh my God -- it's full of stars!
+## Hyjinx
 
 Some [Hy](http://hylang.org) convenience things.
 

@@ -9,7 +9,7 @@
 
 (import inspect [ismodule getsource getsourcefile])
 
-(import hyperspace.lib [slurp])
+(import hyjinx.lib [slurp])
 
 
 (defn get-hy-tree [x]
