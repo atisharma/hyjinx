@@ -3,7 +3,7 @@
 
 (import functools *
         itertools *
-        hyrule [flatten]
+        hyrule [flatten pp]
         cytoolz [first second partition identity])
 
 (import os subprocess)
@@ -42,11 +42,18 @@
           :exist-ok True))  
 
 (defn ! [#* args]
+  "Return the output of running a command in a shell."
   (. (subprocess.run (.join " " args)
                      :shell True
                      :capture-output True
                      :encoding "utf-8")
      stdout))
+
+(defn edit [fname]
+  "Quick and dirty edit. Use system editor if defined, else vi."
+  (let [editor (os.getenv "EDITOR" "vi")]
+    (try
+      (subprocess.run [editor fname] :check True))))
 
 ;; * Strings
 ;; ----------------------------------------------------
@@ -79,7 +86,6 @@ force to lowercase, remove 'the' from start of line."
           (in "." (str x)))
   (.join "." [f"{(int x) : {lpad},.0f}" (second (.split f"{x}" "."))])
   (str x)))
- 
 
 ;; * Manipulations on lists and other basic data structures
 ;; ----------------------------------------------------

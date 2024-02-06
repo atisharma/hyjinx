@@ -2,7 +2,10 @@
 
 (import hyrule [inc dec])
 (import hy.compiler [hy-compile])
+(import hy.repl [REPL])
 
+(import sys os subprocess)
+        
 (import pygments [highlight])
 (import pygments.lexers [get-lexer-by-name])
 (import pygments.formatters [TerminalFormatter])
@@ -86,3 +89,21 @@
     (print header)
     (unless linenos (print))
     (print (highlight (get-source x) lexer formatter))))
+
+(defn interact []
+  "Interact with code from called point."
+  (let [repl (REPL :locals (| (globals) (locals)))]
+    (setv old-ps1 sys.ps1
+          old-ps2 sys.ps2
+          sys.ps1 (+ "=" sys.ps1)
+          repl.ps2 (+ "." sys.ps2))
+    (.interact repl "nested REPL - ctrl-D to exit.")
+    (setv sys.ps1 old-ps1
+          repl.ps2 old-ps2)))
+    
+(defn edit [x]
+  "Quick and dirty edit of source file. Uses the system editor.
+You could also call emacsclient or similar."
+  (let [editor (os.getenv "EDITOR" "vi")]
+    (try
+      (subprocess.run [editor (getsourcefile x)] :check True))))
