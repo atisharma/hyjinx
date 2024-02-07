@@ -133,7 +133,7 @@ force to lowercase, remove 'the' from start of line."
                                (if (is buffering None) [] [#("buffering" buffering)]))))]
     (o.read)))
 
-(defn barf [fname content [mode "w"] [encoding None] [buffering None]]
+(defn spit [fname content [mode "w"] [encoding None] [buffering None]]
   (setv f open)
   (when encoding
     (import codecs)

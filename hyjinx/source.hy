@@ -1,3 +1,5 @@
+"Utilities for code inspection and presentation."
+
 (require hyrule [unless])
 
 (import hyrule [inc dec pformat])
