@@ -1,13 +1,13 @@
 (require hyrule [unless])
 
-(import hyrule [inc dec])
+(import hyrule [inc dec pformat])
 (import hy.compiler [hy-compile])
 (import hy.repl [REPL])
 
-(import sys os subprocess)
+(import sys os subprocess shutil)
         
 (import pygments [highlight])
-(import pygments.lexers [get-lexer-by-name])
+(import pygments.lexers [get-lexer-by-name HyLexer])
 (import pygments.formatters [TerminalFormatter])
 
 (import inspect [ismodule getsource getsourcefile])
@@ -31,7 +31,7 @@
         ext (cut file -3 None)
         lang (match ext
                     ".py" "python"
-                   ".hy" "hylang")
+                    ".hy" "hylang")
         ;; TODO : handle classes
         lnum (if (and (hasattr x "__code__")
                       (hasattr x.__code__ "co_firstlineno"))
@@ -107,3 +107,15 @@ You could also call emacsclient or similar."
   (let [editor (os.getenv "EDITOR" "vi")]
     (try
       (subprocess.run [editor (getsourcefile x)] :check True))))
+
+(defn hylight [s * [bg "dark"]]
+  "Syntax highlight a Hy string. This is nice for use in the repl - put
+`(import hyjinx.source [hylight])
+(setv repl-output-fn hylight)`
+in your .hyrc."
+  (let [formatter (TerminalFormatter :bg bg
+                                     :stripall True)
+        term (shutil.get-terminal-size)]
+    (highlight (pformat s :indent 2 :width (- term.columns 5))
+               (HyLexer)
+               formatter)))

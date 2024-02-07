@@ -3,10 +3,10 @@
 
 (import functools *
         itertools *
-        hyrule [flatten pp]
+        hyrule [flatten pformat pp :as hyrule-pp]
         cytoolz [first second partition identity])
 
-(import os subprocess)
+(import os subprocess shutil)
 (import re)
 (import json)
 (import pathlib [Path])
@@ -86,6 +86,14 @@ force to lowercase, remove 'the' from start of line."
           (in "." (str x)))
   (.join "." [f"{(int x) : {lpad},.0f}" (second (.split f"{x}" "."))])
   (str x)))
+
+;; * Output
+;; ----------------------------------------------------
+
+(defn pp [x #* args #** kwargs]
+  "Pretty-print with better defaults."
+  (let [term (shutil.get-terminal-size)]
+    (hyrule-pp x :indent 2 :width (- term.columns 5) #* args #** kwargs)))
 
 ;; * Manipulations on lists and other basic data structures
 ;; ----------------------------------------------------
