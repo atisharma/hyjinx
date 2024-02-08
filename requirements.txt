@@ -1,5 +1,6 @@
 hy==0.28.0
 hyrule==0.5.0
-pygments
-more-itertools
 cytoolz
+more-itertools
+platformdirs
+pygments

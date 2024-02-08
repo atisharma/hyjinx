@@ -36,8 +36,8 @@
 ;; * OS
 ;; ----------------------------------------------------
 
-(defn mksubdir [d]
-  (.mkdir (Path (.join "/" [path d]))
+(defn mkdir [d]
+  (.mkdir (Path d)
           :parents True
           :exist-ok True))  
 
