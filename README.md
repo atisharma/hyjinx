@@ -15,12 +15,12 @@ Some [Hy](http://hylang.org) convenience things. Compatible with Hy 0.28.0.
 #### Install
 
 ```bash
-$ pip install hyjinx
+$ pip install -U hyjinx
 ```
 
 or, with optional dependencies,
 ```bash
-$ pip install hyjinx[zmq]
+$ pip install -U hyjinx[zmq]
 ```
 
 To install offline hy/hyrule documentation,
