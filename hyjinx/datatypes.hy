@@ -23,9 +23,9 @@ data-matrix       A matrix with times aligned to columns and each row correspond
 
 (defclass Timeseries [UserList]
   "A list of records with some extra methods and attributes.
-Each record must have at least the following keys, set at init,
-time-key : the key for the sequential time index
-value-key : the key for the timeseries values."
+  Each record must have at least the following keys, set at init,
+  time-key : the key for the sequential time index
+  value-key : the key for the timeseries values."
 
   (defn __init__ [self [data None] * symbol [time-key "timestamp"] [value-key "value"] [metadata {}]]
     (setv self.data data)
@@ -61,7 +61,7 @@ value-key : the key for the timeseries values."
 
 (defclass Dataset [UserDict]
   "A dict of timeseries indexed by symbols.
-No guarantees are made of alignment."
+  No efforts are made for alignment."
 
   (defn symbols [self]
      (list (.keys self)))

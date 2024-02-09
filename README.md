@@ -18,6 +18,16 @@ Some [Hy](http://hylang.org) convenience things. Compatible with Hy 0.28.0.
 $ pip install hyjinx
 ```
 
+or, with optional dependencies,
+```bash
+$ pip install hyjinx[zmq]
+```
+
+To install offline hy/hyrule documentation,
+```bash
+$ hy -m hyjinx.docs
+```
+
 #### Optional dependencies
 
-You can install with the `[zmq]` option which also installs [pyzmq](https://pypi.org/project/pyzmq/) and [zstandard](https://pypi.org/project/zstandard/) for the zmq server/client
+You can install with the `[zmq]` option which also installs ecdsa, [pyzmq](https://pypi.org/project/pyzmq/) and [zstandard](https://pypi.org/project/zstandard/) for the zmq server/client

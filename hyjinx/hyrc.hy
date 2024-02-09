@@ -4,11 +4,19 @@ Copy this somewhere and set HYSTARTUP to its location."
 (require hyrule [unless ncut
                  -> ->> as->])
 
-(import hy re json sys os subprocess)
+(import hy
+        re
+        json
+        sys
+        os
+        platform
+        subprocess)
 (import hyrule [pformat])
 (import functools [partial])
 (import importlib [reload])
 (import pydoc [pager])
+
+(import hyjinx)
 
 
 ;; * repl exception hook
@@ -57,3 +65,16 @@ Copy this somewhere and set HYSTARTUP to its location."
 ;; ----------------------------------------------------
 
 (setv (get os.environ "HY_HISTORY") ".hy-history")
+
+;; * banner - confirm hyrc finished loading
+;; ----------------------------------------------------
+
+(setv hy.repl.REPL.banner
+      (fn [self]
+        (.format "🦑 Hy(+jinx) {version}(+{hjv}) using {py}({build}) {pyversion} on {os}"
+                 :version hy.__version__
+                 :hjv (get hyjinx.__version_info__ 2)
+                 :py (platform.python_implementation)
+                 :build (get (platform.python_build) 0)
+                 :pyversion (platform.python_version)
+                 :os (platform.system))))

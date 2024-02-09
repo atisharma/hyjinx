@@ -1,3 +1,5 @@
+"A smorgasbord of useful functions."
+
 (require hyrule [unless -> ->> as->]
          hyjinx.macros *)
 
@@ -6,9 +8,13 @@
         hyrule [flatten pformat pp :as hyrule-pp]
         cytoolz [first second partition identity])
 
-(import os subprocess shutil)
-(import re)
-(import json)
+(import json
+        os
+        re
+        shutil
+        subprocess
+        sys)
+
 (import pathlib [Path])
 (import datetime [datetime])
 
@@ -49,6 +55,15 @@
                      :encoding "utf-8")
      stdout))
 
+(defn shell [[shell "bash"] #* args]
+  "Run an interactive shell as a subprocess.
+Usually, you could instead suspend Hy with ctrl-z."
+  (subprocess.run (.join " " [shell #* args])
+                  :shell False
+                  :stdin sys.stdin
+                  :stdout sys.stdout
+                  :encoding "utf-8"))
+
 (defn edit [fname]
   "Quick and dirty edit. Use system editor if defined, else vi."
   (let [editor (os.getenv "EDITOR" "vi")]
@@ -65,7 +80,7 @@
 
 (defn sstrip [s]
   "Strip surrounding whitespace, quotes, '.',
-force to lowercase, remove 'the' from start of line."
+  force to lowercase, remove 'the' from start of line."
   (re.sub r"^[tT]he " ""
           (-> s
               (.strip "\n\t .\"'`")
@@ -123,6 +138,7 @@ force to lowercase, remove 'the' from start of line."
       (tomllib.loads)))
 
 (defn slurp [fname [mode None] [encoding None] [buffering None]]
+  "Read a file and return as a string."
   (setv f open)
   (when encoding
     (import codecs)
@@ -134,6 +150,7 @@ force to lowercase, remove 'the' from start of line."
     (o.read)))
 
 (defn spit [fname content [mode "w"] [encoding None] [buffering None]]
+  "Write content as file fname."
   (setv f open)
   (when encoding
     (import codecs)
@@ -174,11 +191,11 @@ force to lowercase, remove 'the' from start of line."
 
 (defn jappend [record fname * [encoding "utf-8"]]
  "Append / write a dict to a file as json.
-If the file does not exist, initialise a file with the record.
-If the file exists, append to it.
-Cobbled together from https://stackoverflow.com/a/31224105
-it overwrites the closing ']' with the new record + a new ']'.
-POSIX expects a trailing newline. Assumes utf-8."
+  If the file does not exist, initialise a file with the record.
+  If the file exists, append to it.
+  Cobbled together from https://stackoverflow.com/a/31224105
+  it overwrites the closing ']' with the new record + a new ']'.
+  POSIX expects a trailing newline. Assumes utf-8."
   (if (os.path.isfile fname)
     (with [f (open fname :mode "r+" :encoding encoding)]
       (.seek f 0 os.SEEK_END)

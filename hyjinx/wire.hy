@@ -6,8 +6,8 @@
 (import uuid [uuid1])
 (import zstandard [compress decompress])
 
-(import crypto)
-(import lib [config hash-id])
+(import hyjinx.crypto)
+(import hyjinx.lib [config hash-id])
 
 
 (setv sender-id (. (uuid1) hex))

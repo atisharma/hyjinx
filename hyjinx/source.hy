@@ -13,7 +13,7 @@
 (import pygments [highlight])
 (import pygments.lexers [get-lexer-by-name HyLexer PythonLexer PythonTracebackLexer])
 (import pygments.formatters [TerminalFormatter])
-(import pansi [ansi])
+(import pansi [ansi :as _ansi])
 
 (import inspect [ismodule getsource getsourcefile])
 
@@ -28,13 +28,21 @@
                      :else x.__module__)]
     (hy-compile hy-source module)))
 
-(defn edit-source [x]
-  "Quick and dirty edit of source file. Uses the system editor.
-You could also call emacsclient or similar."
+(defn edit-source [x * [editor None]]
+  "Quick and dirty edit of source file.
+  You could also call emacsclient or similar.
+  Uses, in order of preference:
+      - the editor command passed as an argument
+      - the editor command set by $HYJINX_EDITOR
+      - the system editor set by $EDITOR
+      - vi +{line}
+  It will replace any mention of '{line}' in the editor string with
+  the line number associated with `x`.
+"
   (let [line (:line (get-source-details x))
         editor (os.getenv "HYJINX_EDITOR" (os.getenv "EDITOR" f"vi +{line}"))]
     (try
-      (subprocess.run [editor (getsourcefile x)] :check True))))
+      (subprocess.run [(.replace editor "{line}" (str line)) (getsourcefile x)] :check True))))
 
 (defn get-source-details [x]
   "Get line number, source file of x."
@@ -58,7 +66,7 @@ You could also call emacsclient or similar."
        "language" lang
        "extension" ext}))
 
-(defn get-lines [fname line-number]
+(defn _get-lines [fname line-number]
   (let [source (slurp fname)
         lines (.split source "\n")
         rest-lines (cut lines line-number None)
@@ -81,7 +89,7 @@ You could also call emacsclient or similar."
         lnum (:line details)]
     ;; TODO : handle classes
     (if lnum
-        (get-lines file lnum)
+        (_get-lines file lnum)
         (slurp file))))
 
 (defn get-source [x]
@@ -114,15 +122,15 @@ You could also call emacsclient or similar."
           old-ps2 sys.ps2
           sys.ps1 (+ "=" sys.ps1)
           sys.ps2 (+ "." sys.ps2))
-    (.interact repl f"{ansi.GREEN}nested REPL - ctrl-D to exit.{ansi.reset}")
+    (.interact repl f"{_ansi.GREEN}nested REPL - ctrl-D to exit.{_ansi.reset}")
     (setv sys.ps1 old-ps1
           sys.ps2 old-ps2)))
     
 (defn hylight [s * [bg "dark"] [language "hylang"]]
   "Syntax highlight a Hy (or other language) string. This is nice for use in the repl - put
-`(import hyjinx.source [hylight])
-(setv repl-output-fn hylight)`
-in your .hyrc."
+  (import hyjinx.source [hylight])
+  (setv repl-output-fn hylight)
+  in your .hyrc."
   (let [formatter (TerminalFormatter :bg bg :stripall True)
         term (shutil.get-terminal-size)
         lexer (get-lexer-by-name language)]
@@ -136,11 +144,12 @@ in your .hyrc."
                        [lines-around 2]
                        [linenos True]
                        [ignore ["hy/repl.py"]]]
-  "Exception hook for syntax highlighted traceback. Install using (for example)
-`(setv sys.excepthook (partial exception-hook :lines-around 3 :ignore [\"hy/repl.py\"]`
-(note the use of `partial` to set options) or simply
-`(setv sys.excepthook exception-hook)`
-if you're happy with the defaults."
+  "Exception hook for syntax highlighted traceback.
+  Install using inject-exception-hook, or with
+    (setv sys.excepthook (partial exception-hook :lines-around 3 :ignore [\"hy/repl.py\"]
+  (note the use of `partial` to set options) or simply with
+    (setv sys.excepthook exception-hook)
+  if you're happy with the defaults."
   (setv _tb tb
         lang None
         filename "")
@@ -159,7 +168,7 @@ if you're happy with the defaults."
             code-lexer (get-lexer-by-name lang)
             code-formatter (TerminalFormatter :bg bg :stripall True :linenos linenos)]
         (setv code-formatter._lineno (- lineno lines-around))
-        (sys.stderr.write f"  File {ansi.b}{filename}{ansi._b}, line {lineno}\n")
+        (sys.stderr.write f"  File {_ansi.b}{filename}{_ansi._b}, line {lineno}\n")
         (-> (.join "\n" lines)
             (highlight code-lexer code-formatter)
             (sys.stderr.write))
@@ -175,7 +184,9 @@ if you're happy with the defaults."
         (sys.stderr.write))))
 
 (defn inject-exception-hook [#** kwargs]
-  "Inject the new exception hook."
+  "Inject (install) a new exception hook, for syntax highlighted traceback.
+  Install using (for example)
+  (inject-exception-hook :lines-around 3 :ignore [\"hy/repl.py\"])"
   (try
     _hy_repl
     ;; if it didn't raise an exception, we're already running in a repl
@@ -196,4 +207,3 @@ if you're happy with the defaults."
         (setv (get self.locals (hy.mangle "*e")) sys.last_value))
 
       (setv hy.repl.REPL._error_wrap _error_wrap))))
-

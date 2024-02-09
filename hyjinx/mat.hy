@@ -51,4 +51,5 @@ Convenience things for ndarrays, matrices and numerical data.
   (not (randint 0 (- n 1))))
 
 (defn prod [l]
+  "The product of the elements in l."
   (reduce operator.mul l))
