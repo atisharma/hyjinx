@@ -11,9 +11,9 @@ Starts the socket on import.
 (import zmq.asyncio)
 
 (import logging)
-(import crypto)
-(import lib [repeat config hash-id])
-(import wire [wrap unwrap zerror])
+(import hyjinx.crypto)
+(import hyjinx.lib [repeat config hash-id])
+(import hyjinx.wire [wrap unwrap zerror])
 
 
 (setv SendError (Exception "Message (reply) send failed.")

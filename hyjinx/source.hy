@@ -6,12 +6,14 @@
 (import hy.compiler [hy-compile])
 (import hy.repl [REPL])
 
+(import functools [partial])
+
 (import sys os traceback subprocess shutil)
 
 (import pygments [highlight])
 (import pygments.lexers [get-lexer-by-name HyLexer PythonLexer PythonTracebackLexer])
 (import pygments.formatters [TerminalFormatter])
-(import colorama)
+(import pansi [ansi])
 
 (import inspect [ismodule getsource getsourcefile])
 
@@ -59,14 +61,16 @@ You could also call emacsclient or similar."
 (defn get-lines [fname line-number]
   (let [source (slurp fname)
         lines (.split source "\n")
-        rest-lines (cut lines line-number)
+        rest-lines (cut lines line-number None)
         defn-lines []
         paren-excess 0]
     (for [l rest-lines]
       (.append defn-lines l)
       (+= paren-excess (l.count "("))
       (-= paren-excess (l.count ")"))
-      (unless paren-excess (break)))
+      (unless (or paren-excess
+                  (not (.count l ")")))
+              (break)))
     (.join "\n" defn-lines)))  
            
 (defn get-hy-source [x]
@@ -76,8 +80,7 @@ You could also call emacsclient or similar."
         module (:module details)
         lnum (:line details)]
     ;; TODO : handle classes
-    (if (and (hasattr x "__code__")
-             (hasattr x.__code__ "co_firstlineno"))
+    (if lnum
         (get-lines file lnum)
         (slurp file))))
 
@@ -111,7 +114,7 @@ You could also call emacsclient or similar."
           old-ps2 sys.ps2
           sys.ps1 (+ "=" sys.ps1)
           sys.ps2 (+ "." sys.ps2))
-    (.interact repl f"{colorama.Fore.GREEN}nested REPL - ctrl-D to exit.{colorama.Fore.RESET}")
+    (.interact repl f"{ansi.GREEN}nested REPL - ctrl-D to exit.{ansi.reset}")
     (setv sys.ps1 old-ps1
           sys.ps2 old-ps2)))
     
@@ -127,12 +130,12 @@ in your .hyrc."
                (HyLexer)
                formatter)))
 
-(defn exception-hook [exc-type exc-value tb *
-                      [bg "dark"]
-                      [limit 4]
-                      [lines-around 2]
-                      [linenos True]
-                      [ignore ["hy/repl.py"]]]
+(defn _exception-hook [exc-type exc-value tb *
+                       [bg "dark"]
+                       [limit 4]
+                       [lines-around 2]
+                       [linenos True]
+                       [ignore ["hy/repl.py"]]]
   "Exception hook for syntax highlighted traceback. Install using (for example)
 `(setv sys.excepthook (partial exception-hook :lines-around 3 :ignore [\"hy/repl.py\"]`
 (note the use of `partial` to set options) or simply
@@ -156,7 +159,7 @@ if you're happy with the defaults."
             code-lexer (get-lexer-by-name lang)
             code-formatter (TerminalFormatter :bg bg :stripall True :linenos linenos)]
         (setv code-formatter._lineno (- lineno lines-around))
-        (sys.stderr.write f"  File {colorama.Style.BRIGHT}{filename}{colorama.Style.RESET-ALL}, line {lineno}")
+        (sys.stderr.write f"  File {ansi.b}{filename}{ansi._b}, line {lineno}\n")
         (-> (.join "\n" lines)
             (highlight code-lexer code-formatter)
             (sys.stderr.write))
@@ -170,3 +173,27 @@ if you're happy with the defaults."
     (-> (.join "" fexc)
         (highlight (PythonTracebackLexer) exc-formatter)
         (sys.stderr.write))))
+
+(defn inject-exception-hook [#** kwargs]
+  "Inject the new exception hook."
+  (try
+    _hy_repl
+    ;; if it didn't raise an exception, we're already running in a repl
+    ;; so we can just replace the global exception handler
+    (setv sys.excepthook (partial _exception-hook #** kwargs))
+
+    (except [NameError]
+      ;; _hy_repl doesn't exist, meaning the repl is yet to be started
+      ;; so we replace the original class method
+      (defn _error_wrap [self [exc_info_override False] #* _args #** _kwargs]
+        (setv [sys.last_type sys.last_value sys.last_traceback] (sys.exc_info))
+        (when exc_info_override
+            ;; Use a traceback that doesn't have the REPL frames.
+            (setv sys.last_type (self.locals.get "_hy_last_type" sys.last_type))
+            (setv sys.last_value (self.locals.get "_hy_last_value" sys.last_value))
+            (setv sys.last_traceback (self.locals.get "_hy_last_traceback" sys.last_traceback)))
+        ((partial _exception-hook #** kwargs) sys.last_type sys.last_value sys.last_traceback)
+        (setv (get self.locals (hy.mangle "*e")) sys.last_value))
+
+      (setv hy.repl.REPL._error_wrap _error_wrap))))
+

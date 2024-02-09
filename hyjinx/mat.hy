@@ -12,7 +12,7 @@ Convenience things for ndarrays, matrices and numerical data.
 (import random [randint])
 (import shutil)
 (import operator)
-(import colorama.Fore [YELLOW GREEN RED BLUE RESET])
+(import pansi [ansi])
 
 
 ;; * Matrices
@@ -35,13 +35,13 @@ Convenience things for ndarrays, matrices and numerical data.
         s-width (len (last (.split s "\n")))]
     (print)
     (print desc)
-    (print f"{YELLOW}╭──{RESET}\n│" :end "")
+    (print f"{ansi.YELLOW}╭──{ansi.reset}\n│" :end "")
     (-> s
         (.replace "_" thou-sep)
         (.replace "[" "")
         (.replace "]" "")
-        (print :end f"{YELLOW}│{RESET}\n"))
-    (print f"{YELLOW}{"──╯" :>{(- s-width 2)}}{RESET}")))
+        (print :end f"{ansi.YELLOW}│{ansi.reset}\n"))
+    (print f"{ansi.YELLOW}{"──╯" :>{(- s-width 2)}}{ansi.reset}")))
 
 ;; * Numeric
 ;; ----------------------------------------------------

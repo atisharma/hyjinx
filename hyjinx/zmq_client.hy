@@ -8,8 +8,8 @@ Starts the socket on import.
 (import json)
 (import zmq)
 
-(import wire [wrap unwrap zerror])
-(import lib [config])
+(import hyjinx.wire [wrap unwrap zerror])
+(import hyjinx.lib [config])
 
 
 (setv context (zmq.Context))

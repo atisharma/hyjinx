@@ -7,6 +7,7 @@ Some [Hy](http://hylang.org) convenience things. Compatible with Hy 0.28.0.
 - REPL syntax highlighting (put `(import hyjinx.source [hylight]) (setv repl-output-fn hylight)` in your .hyrc)
 - pretty tracebacks with correct syntax highlighting for hy or python
 - print/get/edit source code of a function, module etc.
+- `defmethod` (if `multimethod` is installed)
 - numpy array pretty printing
 - a zmq lazy pirate protocol
 - a minimal ncurses class

@@ -2,5 +2,7 @@ hy==0.28.0
 hyrule==0.5.0
 cytoolz
 more-itertools
+pansi
 platformdirs
 pygments
+multimethod

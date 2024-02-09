@@ -5,20 +5,25 @@ Copy this somewhere and set HYSTARTUP to its location."
                  -> ->> as->])
 
 (import hy re json sys os subprocess)
+(import hyrule [pformat])
 (import functools [partial])
 (import importlib [reload])
 (import pydoc [pager])
 
 
+;; * repl exception hook
+;; ----------------------------------------------------
+
+(import hyjinx.source [inject-exception-hook])
+(inject-exception-hook :lines-around 3
+                       :ignore ["/hy/repl.py"])
+
 ;; * hyjinx utilities
 ;; ----------------------------------------------------
 
-(try
-  (import hyjinx.source [edit-source get-source print-source hylight exception-hook interact])
-  (import hyjinx.lib [! edit pp slurp spit])
-  (import hyjinx.docs [hy-doc hyrule-doc])
-  (setv sys.excepthook (partial exception-hook :lines-around 3 :ignore ["/hy/repl.py"]))
-  (except [ModuleNotFoundError]))
+(import hyjinx.lib [! edit pp slurp spit])
+(import hyjinx.docs [hy-doc hyrule-doc])
+(require hyjinx.macros *)
 
 ;; * numpy-related things
 ;; ----------------------------------------------------
@@ -28,15 +33,23 @@ Copy this somewhere and set HYSTARTUP to its location."
   (import hyjinx.mat [ppa])
   (except [ModuleNotFoundError]))
 
-;; * pretty-printing and syntax highlighting
+;; * repl code introspection
+;; ----------------------------------------------------
+
+(import hyjinx.source [edit-source get-source print-source interact])
+
+;; * repl pretty-printing and syntax highlighting
 ;; ----------------------------------------------------
 
 (try
+  (import hyjinx.source [hylight])
   (setv repl-output-fn hylight)
   (except [NameError]
     (setv repl-output-fn (partial pformat :indent 2))))
 
-;; for Hy 0.29.0
+;; * nice prompt for Hy 0.29.0
+;; ----------------------------------------------------
+
 (setv repl-ps1 "\x01\x1b[0;32m\x02=> \x01\x1b[0m\x02"
       repl-ps2 "\x01\x1b[0;31m\x02... \x01\x1b[0m\x02")
 

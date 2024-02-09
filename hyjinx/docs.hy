@@ -40,14 +40,17 @@
 
 (defn hy-doc [[page "index"] * [package "hy"] [use-pager True] [bg "dark"]]
   "Show hy docs (or another package). For example, `(hy-doc \"whyhy\")` or `(hy-doc \"NEWS\")."
-  (let [formatter (TerminalFormatter :bg bg :stripall True)
-        term (shutil.get-terminal-size)
-        cachedir (user-cache-dir __package__ __name__)
-        fname f"{cachedir}/docs/{package}/{page}.rst"
-        text (highlight (slurp fname) (RstLexer) formatter)]
-    (if use-pager
-        (pager text)
-        (print text))))
+  (try
+    (let [formatter (TerminalFormatter :bg bg :stripall True)
+          term (shutil.get-terminal-size)
+          cachedir (user-cache-dir __package__ __name__)
+          fname f"{cachedir}/docs/{package}/{page}.rst"
+          text (highlight (slurp fname) (RstLexer) formatter)]
+      (if use-pager
+          (pager text)
+          (print text)))
+    (except [FileNotFoundError]
+      (raise (FileNotFoundError f"Could not find '{page}' - did you correctly type the page name and install the documentation with (doc.install)?")))))
 
 (defn hyrule-doc [#* args #** kwargs]
   "Show hyrule docs."
