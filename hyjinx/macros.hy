@@ -1,12 +1,16 @@
 "Convenience macros."
 
-(export :macros [delmacro .. prepend append defmethod defstruct help-macro])
+(export :macros [delmacro rest .. prepend append defmethod defstruct help-macro])
 
 
 (defmacro delmacro [m]
   "Delete a macro."
   `(eval-when-compile
      (del (get _hy_macros (hy.mangle m)))))
+  
+(defmacro rest [xs]
+  "All but the last of xs."
+  `(cut ~xs 1 None))
   
 (defmacro .. [a b [step 1]]
   "A realised range."
@@ -22,14 +26,20 @@
 
 (defmacro defmethod [f #* body]
   "Define a multimethod.
-  For example,
-  (defmethod f [#^ int x #^ float y] (// x (int y)))
-  will compile to the python code
+  For example, the Hy code
+
+  (import multimethod [multimethod])
+  (defmethod f [#^ int x #^ float y]
+    (// x (int y)))
+
+  will compile to the following python code:
+
+  import multimethod from multimethod
   @multimethod
   def f(x: int, y: float):
       return(x // int(y))`
-  You have to import multimethod where it is used:
-  (import multimethod [multimethod])"
+
+  You have to import multimethod where it is to be used."
   `(defn [multimethod] ~f
      ~@body))
 

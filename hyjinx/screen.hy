@@ -1,7 +1,5 @@
-"""
-A simple curses display class with context manager.
-You'll need to start the main using (.wrapper curses ...).
-"""
+"A simple curses display class with context manager.
+You'll need to start the main using (.wrapper curses ...)."
 
 (import curses)
 (import logging)

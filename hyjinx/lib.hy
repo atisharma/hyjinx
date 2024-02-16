@@ -1,14 +1,20 @@
-"A smorgasbord of useful functions."
+"
+A smorgasbord of useful functions.
+"
 
 (require hyrule [unless -> ->> as->]
          hyjinx.macros *)
 
+(require hyjinx.macros [rest])
+
 (import functools *
         itertools *
-        hyrule [flatten pformat pp :as hyrule-pp]
-        cytoolz [first second partition identity])
+        cytoolz [first second last partition identity]
+        hyrule [flatten pformat pp :as hyrule-pp])
 
 (import json
+        math
+        operator
         os
         re
         shutil
@@ -18,13 +24,14 @@
 (import pathlib [Path])
 (import datetime [datetime])
 
-(import hashlib [sha1])
+(import random [randint])
+(import hashlib [sha1 md5])
 
 
 ;; * Functions
 ;; ----------------------------------------------------
 
-(defn partial [f #* args #** kwargs]
+(defn named-partial [f #* args #** kwargs]
   "functools.partial, but with a new function name set."
   (setv f-partial (partial f #* args #** kwargs))
   (setv f-partial.__name__ (.join "_" [(name f) #*(map str args) #*(map str (flatten (.items kwargs)))]))
@@ -54,6 +61,24 @@
                      :capture-output True
                      :encoding "utf-8")
      stdout))
+
+(defn cd [path]
+  "Change directory."
+  (os.chdir path))
+
+(defn ls [[path None]]
+  "Directory listing."
+  (os.listdir path))
+
+(defn re-grep [regex lines * [line-nos False]]
+  "Return items in a string or iterable of strings (lines) that match a regular expression."
+  (let [rx (re.compile regex)
+        ls (if (isinstance lines str)
+               (.split lines "\n")
+               lines)]
+    (if line-nos
+      (lfor [ln l] (enumerate ls) :if (re.search regex l) f"{ln :04d}: {l}")
+      (lfor l ls :if (re.search regex l) l))))
 
 (defn shell [[shell "bash"] #* args]
   "Run an interactive shell as a subprocess.
@@ -102,6 +127,37 @@ Usually, you could instead suspend Hy with ctrl-z."
   (.join "." [f"{(int x) : {lpad},.0f}" (second (.split f"{x}" "."))])
   (str x)))
 
+;; * Numeric
+;; ----------------------------------------------------
+
+(defn sign [x]
+  "+1 for x>=0 (if x is positive semidefinite), -1 for x<0 (negative definite)."
+  (math.copysign 1 x))
+
+(defn round-to [x y]
+  "Round x to precision y, towards zero."
+  (* y (int (/ x y))))
+
+(defn pos? [x]
+  "x is positive (including zero)."
+  (>= x 0))
+  
+(defn neg? [x]
+  "x is strictly negative (excludes zero)."
+  (< x 0))
+
+(defn zero? [x]
+  "x is exactly (integer) zero."
+  (= x 0))
+  
+(defn dice [n]
+  "True 1/n of the time."
+  (not (randint 0 (- n 1))))
+
+(defn prod [l]
+  "The product of the elements in l."
+  (reduce operator.mul l))
+
 ;; * Output
 ;; ----------------------------------------------------
 
@@ -109,6 +165,18 @@ Usually, you could instead suspend Hy with ctrl-z."
   "Pretty-print with better defaults."
   (let [term (shutil.get-terminal-size)]
     (hyrule-pp x :indent 2 :width (- term.columns 5) #* args #** kwargs)))
+
+(defn hash-color [s]
+  "A hex RGB colour mapped from a string."
+  (import pansi [ansi])
+  (let [S (.upper s)
+        i (-> (.upper s)
+              (.encode "utf-8")
+              (md5)
+              (.hexdigest)
+              (int 16)
+              (% (** 2 24)))]
+    (get ansi.rgb (.replace f"{i :#x}" "0x" "#"))))
 
 ;; * Manipulations on lists and other basic data structures
 ;; ----------------------------------------------------
@@ -123,6 +191,16 @@ Usually, you could instead suspend Hy with ctrl-z."
   "Return first n items of iterable as a list."
   ;; see more-itertools
   (list (islice it n)))
+
+(defn get-in [coll #* args]
+  "A recursive get that returns None in case of missing keys."
+  (if (and (isinstance coll dict)
+           args
+           (in (first args) coll))
+    (get-in (get coll (first args)) #* (rest args))
+    (if args
+        None
+        coll)))
 
 ;; * Files
 ;; ----------------------------------------------------

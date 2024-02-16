@@ -11,7 +11,8 @@ data-matrix       A matrix with times aligned to columns and each row correspond
 
 """
 
-(require hyrule [unless -> ->> as->]
+(require hyrule [unless -> ->> as->
+                 ap-map]
          hyjinx.macros *)
 
 (import collections [UserList UserDict])
@@ -36,7 +37,7 @@ data-matrix       A matrix with times aligned to columns and each row correspond
 
   (defn values [self [kw None]]
     "A list of values on kw in the timeseries records."
-    (amap (get it (or kw self.value-key)) self))
+    (ap-map (get it (or kw self.value-key)) self))
 
   (defn vector [self [kw None] * [dtype float]]
     "Convert a timeseries to a vector (on kw)."
@@ -69,7 +70,7 @@ data-matrix       A matrix with times aligned to columns and each row correspond
   (defn matrix [self kw * [dtype float]]
     "Convert a dataset to a matrix (samples x instruments, on kw)."
     (numpy.array
-      (list (amap (list (.values it kw)) (.values self)))
+      (list (ap-map (list (.values it kw)) (.values self)))
       :dtype dtype))
 
   (defn vector [self kw symbol]

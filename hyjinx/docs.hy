@@ -18,7 +18,7 @@
 
 
 
-(defn _install_docs [tarball-url package]
+(defn _install_docs [tarball-url package * [extension ".rst"]]
   "Download a local copy of some specific documentation."
   (let [cachedir (user-cache-dir __package__ __name__)
         tarball f"{cachedir}/{package}.tar.gz"]
@@ -27,7 +27,7 @@
     (urllib.request.urlretrieve tarball-url :filename tarball) 
     (with [tf (tarfile.open tarball "r")]
       (for [f (tf.getmembers)]
-        (when (f.path.endswith ".rst")
+        (when (f.path.endswith extension)
           (setv f.name (os.path.basename f.name))
           ;; unpack and copy docs/*.rst to cache
           (tf.extract :member f :path f"{cachedir}/docs/{package}"))))

@@ -10,13 +10,18 @@ Convenience things for ndarrays, matrices and numerical data.
         cytoolz [last])
 
 (import numpy)
-(import random [randint])
+(import numpy [ndarray])
 (import shutil)
-(import operator)
 (import pansi [ansi :as _ansi])
 
+;; user probably doesn't have jax available
+;; this is useful for methods on both array types
+(try
+  (import jax.numpy)
+  (setv ndarray (| jax.numpy.ndarray ndarray)))
 
-;; * Matrices
+
+;; * Matrices and arrays
 ;; ----------------------------------------------------
 
 (setv _colors [_ansi.blue
@@ -30,7 +35,8 @@ Convenience things for ndarrays, matrices and numerical data.
                _ansi.CYAN
                _ansi.MAGENTA])
 
-(defn ppa [a #** kwargs]
+(defn ppa [#^ ndarray a
+           #** kwargs]
   "Pretty-print a numpy ndarray."
   (let [col (get _colors (% (len _colors) a.ndim))]
     (match a.ndim
@@ -42,16 +48,16 @@ Convenience things for ndarrays, matrices and numerical data.
                          (describe a)
                          _ansi.reset))))))
 
-(defn describe [a]
+(defn describe [#^ ndarray a]
   f"{a.ndim}D: {(.join "×" (map str a.shape))}  ({(prod a.shape)} elements)  {a.dtype}  {a.nbytes}B")
 
-(defn _pformat-array [a * [precision 3] [digits None] [thou-sep ","] [suppress-small True] [formatter None]]
+(defn _pformat-array [#^ ndarray a * [precision 3] [digits None] [thou-sep ","] [suppress-small True] [formatter None]]
   "Wrap sub-array (matrix) with a border and return a string."
   (let [digits (+ 4
                   (or digits (int (numpy.log10 (numpy.max (abs a))))))
         formatter (or formatter {"float_kind" (fn [x] f" {x :=+{(+ precision digits)}_.{precision}f} ")
-                                 "int_kind" (fn [x] f" {x :=+{digits}_d} ")
-                                 "complex_kind" (fn [x] f" {x :=+{(+ precision digits)}_.{precision}f} ")})
+                                 "int_kind" (fn [x] f" {x :=+{digits}_d} ")})
+                                 ;"complex_kind" (fn [x] f" {x :=+{(+ precision digits)}_.{precision}f} ")})
         ts (shutil.get-terminal-size)
         width (- ts.columns 8)
         s (numpy.array2string a :formatter formatter
@@ -63,7 +69,8 @@ Convenience things for ndarrays, matrices and numerical data.
         (.replace "[ " " ")
         (.replace " ]" " "))))
 
-(defn _add-corners-1d [v #** kwargs]
+(defn _add-corners-1d [#^ ndarray v
+                       #** kwargs]
   "Add nice corners to _pformatted ndarray of dimension 1."
   (let [padding "  "
         s (_pformat-array v #** kwargs)
@@ -72,7 +79,8 @@ Convenience things for ndarrays, matrices and numerical data.
         br-corner f"{_ansi.green}│\n{"──╯" :>{br-width}}{_ansi.reset} "]
     (+ tl-corner s br-corner)))
 
-(defn _add-corners-2d [m #** kwargs]
+(defn _add-corners-2d [#^ ndarray m
+                       #** kwargs]
   "Add nice corners to _pformatted ndarray of dimension 2."
   (let [padding "  "
         s (_pformat-array m #** kwargs)
@@ -83,15 +91,3 @@ Convenience things for ndarrays, matrices and numerical data.
     (-> s
         (.replace "[ " tl-corner)
         (.replace " ]" br-corner))))
-
-
-;; * Numeric
-;; ----------------------------------------------------
-
-(defn dice [n]
-  "True 1/n of the time."
-  (not (randint 0 (- n 1))))
-
-(defn prod [l]
-  "The product of the elements in l."
-  (reduce operator.mul l))

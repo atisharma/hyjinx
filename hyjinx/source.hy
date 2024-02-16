@@ -1,4 +1,6 @@
-"Utilities for code inspection and presentation."
+"
+Utilities for code inspection and presentation.
+"
 
 (require hyrule [-> ->> unless])
 
