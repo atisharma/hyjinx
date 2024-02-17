@@ -1,4 +1,4 @@
-## 🦑 Hyjinx 🦑
+## 🦑 Hyjinx
 
 Some [Hy](http://hylang.org) convenience things. Compatible with Hy 0.28.0.
 

@@ -47,10 +47,14 @@ Copy this somewhere and set HYSTARTUP to its location."
   (import hyjinx.mat [ppa])
   (except [ModuleNotFoundError]))
 
-;; * repl code introspection
+;; * repl code introspection and discussion
 ;; ----------------------------------------------------
 
 (import hyjinx.source [edit-source get-source print-source interact])
+
+(try
+  (import hyjinx [llm])
+  (except [ModuleNotFoundError]))
 
 ;; * repl pretty-printing and syntax highlighting
 ;; ----------------------------------------------------
@@ -79,7 +83,7 @@ Copy this somewhere and set HYSTARTUP to its location."
       (fn [self]
         (.format "🦑 Hy(+jinx) {version}(+{hjv}) using {py}({build}) {pyversion} on {os}"
                  :version hy.__version__
-                 :hjv (get hyjinx.__version_info__ 2)
+                 :hjv (get (.split hyjinx.__version__ "." 2))
                  :py (platform.python_implementation)
                  :build (get (platform.python_build) 0)
                  :pyversion (platform.python_version)

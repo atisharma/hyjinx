@@ -2,19 +2,20 @@
 A Large Language Model in your repl.
 "
 
-(require hyrule [-> ->> unless])
+(require hyrule [-> ->> unless of])
 (require hyjinx.macros [defmethod])
 
 (import hyrule [pformat])
-(import hyjinx.lib [first last])
+(import hyjinx.lib [first last hash-color])
 (import hyjinx.source [get-source get-source-details])
 
-(import httpx
-        shutil)
+(import httpx shutil)
 (import types [ModuleType FunctionType MethodType TracebackType])
+(import itertools [tee])
 (import multimethod [multimethod])
 (import openai [OpenAI])
 (import json.decoder [JSONDecodeError])
+(import pansi [ansi :as _ansi])
 
 
 (defclass TabbyClientError [Exception])
@@ -25,44 +26,90 @@ A Large Language Model in your repl.
 ;; * the actually useful functions 
 ;; -----------------------------------------------------------------------------
 
-(defmethod discuss [#^ OpenAI client #^ str prompt *
-                    [print True]
-                    [margin "  "]
-                    [width None]
-                    [max-tokens 500]
-                    #** kwargs]
-  "Just ask a general question, no object, no chat."
-  (let [sys (_system "You are an intelligent assistant.")
+(defmethod converse [#^ OpenAI client #^ (of list dict) messages #^ str content *
+                     [system-prompt "You are an intelligent and concise assistant."]
+                     [max-tokens 1000]
+                     [color None]
+                     #** kwargs]
+  "Chat over a list of messages and update in-place the message list.
+  The system prompt is injected each call so can be changed.
+
+  You might use this function like:
+  (setv _messages [])
+  (setv chat (partial converse tabby _messages))
+  (chat \"Hello there.\")"
+  (let [sys (_system system-prompt)
+        usr (_user content)
+        width (.pop kwargs "width" None)
+        margin (.pop kwargs "margin" "    ")
+        [output-1 output-2] (tee (_completion
+                                   client
+                                   [sys #* messages usr]
+                                   :max-tokens max-tokens
+                                   #** kwargs))]
+    (_output output-1
+             :print True
+             :width width
+             :margin margin
+             :color (or color (hash-color (or client.model ""))))
+    (.append messages usr)
+    (.append messages (_assistant (_output output-2 :print False)))))
+
+(defmacro definstruct [f prompt]
+  "Create a function that instructs over a python/hy object."
+  `(defn ~f [client obj * [print True] #** kwargs]
+     ~prompt
+     (instruct client
+              ~prompt
+              obj
+              :print print
+              #** kwargs)))
+
+(defmethod instruct [#^ OpenAI client #^ str prompt *
+                     [print True]
+                     [margin "  "]
+                     [width None]
+                     [system-prompt "You are an intelligent and concise assistant."]
+                     [max-tokens 1000]
+                     [color _ansi.reset]
+                     #** kwargs]
+  "Just ask a general instruction or question, no object, no chat."
+  (let [sys (_system system-prompt)
         usr (_user prompt)
         stream (_completion client [sys usr] :max-tokens max-tokens #** kwargs)]
-    (_output stream :print print :width width :margin margin)))
+    (_output stream :print print :width width :margin margin :color color)))
 
-(defmethod discuss [#^ OpenAI client #^ str prompt #^ HasCodeType obj *
-                    [print True]
-                    [margin "  "]
-                    [width None]
-                    [max-tokens 500]
-                    #** kwargs]
-  "Discuss a hy or python object's source code."
+(defmethod instruct [#^ OpenAI client #^ str prompt #^ HasCodeType obj *
+                     [print True]
+                     [margin "  "]
+                     [width None]
+                     [system-prompt  "You are an intelligent, expert and concise senior programmer."]
+                     [max-tokens 1000]
+                     [color _ansi.reset]
+                     #** kwargs]
+  "Instruct a hy or python object's source code."
   (let [details (get-source-details obj)
         language (:language details)
         source (get-source obj)
-        sys (_system "You are an intelligent programming assistant.")
-        usr (_user f"{prompt}\nHere is the {language} code for {obj}:\n{source}")
+        sys (_system system-prompt)
+        usr (_user f"{prompt} The code is in the {language} language.
+{obj}, module {(:module details)}, file {(:file details)}, line {(:line details)}
+
+{source}")
         stream (_completion client [sys usr] :max-tokens max-tokens #** kwargs)]
-    (_output stream :print print :width width :margin margin)))
+    (_output stream :print print :width width :margin margin :color color)))
 
-(defmethod explain [#^ OpenAI client #^ HasCodeType obj * [print True] #** kwargs]
-  "Explain the purpose of a hy or python object from its source code."
-  (discuss client f"Clearly explain the purpose of the following code." obj :print print #** kwargs))
+(definstruct comments "Rewrite the following code, with high-quality comments.")
 
-(defmethod docstring [#^ OpenAI client #^ HasCodeType obj * [print True] #** kwargs]
-  "Write a docstring for an object from its source code."
-  (discuss client f"Write a good docstring for the following code." obj :print print #** kwargs))
+(definstruct docstring "Write a high-quality docstring for the following code.")
 
-(defmethod write-test [#^ OpenAI client #^ HasCodeType obj * [print True] #** kwargs]
-  "Write a test for an object from its source code."
-  (discuss client f"Write a good test for the following code." obj :print print #** kwargs))
+(definstruct explain "Clearly explain the purpose of the following code.")
+
+(definstruct review "Give a high-quality peer-review of the following code. Identify any bugs, logic errors, and overlooked edge cases. Briefly explain your reasoning. Concentrate on the most important points first.")
+
+(definstruct rewrite "Rewrite the following code in the same language, improving quality and clarity. Briefly state what you will do before giving the rewritten code.")
+
+(definstruct test "Write a high-quality test for the following code.")
 
 ;; * message convenience functions
 ;; -----------------------------------------------------------------------------
@@ -90,13 +137,21 @@ A Large Language Model in your repl.
 (defn _output [stream * [print True] #** kwargs]
   (if print
       (_print-stream stream #** kwargs)
-      (.join "" stream)))
+      (.join "" (lfor chunk stream :if (-> chunk.choices
+                                            (first)
+                                            (getattr "delta")
+                                            (getattr "content"))
+                      (let [choice (first chunk.choices)
+                            content choice.delta.content]
+                        content)))))
 
-(defn _print-stream [stream * [width None] [margin "  "]]
+(defn _print-stream [stream * [width None] [margin "  "] [color _ansi.reset]]
   "Print a streaming chat completion."
-  (let [term (shutil.get-terminal-size)]
+  (let [term (shutil.get-terminal-size)
+        w (if width (min width (- term.columns 5))
+                    (- term.columns 5))]     
     (setv line "")
-    (print margin :end "")
+    (print margin :end color)
     (for [chunk stream :if (-> chunk.choices
                                 (first)
                                 (getattr "delta")
@@ -109,20 +164,19 @@ A Large Language Model in your repl.
                 (print f"{content}{margin}" :end "")
                 (setv line ""))
 
-              (> (+ (len line) (len margin))
-                 (or width (- term.columns 5)))
+              (> (+ (len line) (len margin)) w)
               (do (print f"\n{margin}{(.strip content)}" :end "")
                   (setv line (.strip content)))
 
               :else
               (print content :end "" :flush True))))
-    (print)))
+    (print _ansi.reset)))
 
 ;; * the Tabby API client
 ;; ----------------------------------------------------
 
 (defclass TabbyClient [OpenAI]
-  "A REPL-facing client for TabbyAPI."
+  "A REPL-facing client for TabbyAPI (https://github.com/theroyallab/tabbyAPI)."
 
   (defn __init__ [self #** kwargs]
     "base-url should have the 'v1' at the end."
@@ -161,7 +215,7 @@ A Large Language Model in your repl.
         for chunk in stream:
             print(chunk.choices[0].delta.content or '', end='') "
   (client.chat.completions.create
-    :model (.pop kwargs "model" (getattr client "model" "gpt-3.5-turbo"))
+    :model (.pop kwargs "model" (getattr client "model" "gpt-4-turbo-preview"))
     :messages messages
     :stream stream
     #** kwargs))
@@ -220,16 +274,16 @@ A Large Language Model in your repl.
   kwargs are passed to the API.
   See the TabbyAPI docs for valid keys and values."
   ;; TODO : steam response to show progress
-  (client._post "model/load"
-                :admin True
-                :name model
-                #** kwargs))
+  (let [response (client._post "model/load" :admin True :name model #** kwargs)]
+    (setv client.model model)
+    (print f"{model} loaded.")))
 
 (defmethod model-unload [#^ TabbyClient client]
   "Unload a model.
    TabbyAPI needs to load/unload models before use."
   (client._post "model/unload"
-                :admin True))
+                :admin True)
+  (setv client.model None))
 
 (defmethod lora-load [#^ TabbyClient client #^ list loras]
   "Load LoRas when using TabbyAPI.

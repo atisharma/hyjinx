@@ -22,15 +22,15 @@ Utilities for code inspection and presentation.
 (import hyjinx.lib [slurp])
 
 
-(defn get-hy-tree [x]
+(defn get-hy-tree [obj]
   "Returns the AST of a hy module, function, class etc."
-  (let [file (getsourcefile x)
+  (let [file (getsourcefile obj)
         hy-source (slurp file)
-        module (cond (ismodule x) x.__name__
-                     :else x.__module__)]
+        module (cond (ismodule obj) obj.__name__
+                     :else obj.__module__)]
     (hy-compile hy-source module)))
 
-(defn edit-source [x * [editor None]]
+(defn edit-source [obj * [editor None]]
   "Quick and dirty edit of source file.
   You could also call emacsclient or similar.
   Uses, in order of preference:
@@ -39,18 +39,18 @@ Utilities for code inspection and presentation.
       - the system editor set by $EDITOR
       - vi +{line}
   It will replace any mention of '{line}' in the editor string with
-  the line number associated with `x`.
+  the line number associated with `obj`.
 "
-  (let [line (:line (get-source-details x))
+  (let [line (:line (get-source-details obj))
         editor (os.getenv "HYJINX_EDITOR" (os.getenv "EDITOR" f"vi +{line}"))]
     (try
-      (subprocess.run [(.replace editor "{line}" (str line)) (getsourcefile x)] :check True))))
+      (subprocess.run [(.replace editor "{line}" (str line)) (getsourcefile obj)] :check True))))
 
-(defn get-source-details [x]
-  "Get line number, source file of x."
-  (let [file (getsourcefile x)
-        module (cond (ismodule x) x.__name__
-                     :else x.__module__)
+(defn get-source-details [obj]
+  "Get line number, source file of obj."
+  (let [file (getsourcefile obj)
+        module (cond (ismodule obj) obj.__name__
+                     :else obj.__module__)
         ext (cut file -3 None)
         lang (match ext
                     ".py" "python"
@@ -58,9 +58,9 @@ Utilities for code inspection and presentation.
                     ".pytb" "pytb"
                     ".py3tb" "py3tb")
         ;; TODO : handle classes
-        lnum (if (and (hasattr x "__code__")
-                      (hasattr x.__code__ "co_firstlineno"))
-                 (- x.__code__.co-firstlineno 1)
+        lnum (if (and (hasattr obj "__code__")
+                      (hasattr obj.__code__ "co_firstlineno"))
+                 (- obj.__code__.co-firstlineno 1)
                  0)]
       {"line" lnum
        "module" module
@@ -83,9 +83,9 @@ Utilities for code inspection and presentation.
               (break)))
     (.join "\n" defn-lines)))  
            
-(defn get-hy-source [x]
+(defn get-hy-source [obj]
   "Returns the source code of a hy module or the module of a hy function, class etc."
-  (let [details (get-source-details x)
+  (let [details (get-source-details obj)
         file (:file details)
         module (:module details)
         lnum (:line details)]
@@ -94,39 +94,48 @@ Utilities for code inspection and presentation.
         (_get-lines file lnum)
         (slurp file))))
 
-(defn get-source [x]
+(defn get-source [obj]
   "Get the source for a python or hy function, module or other object."
-  (let [details (get-source-details x)
+  (let [details (get-source-details obj)
         lang (:language details)]
-    (cond (= lang "python") (getsource x)
-          (= lang "hylang") (get-hy-source x)
+    (cond (= lang "python") (getsource obj)
+          (= lang "hylang") (get-hy-source obj)
           :else (raise (NotImplementedError f"Filetype {(:extension details)} is unknown.")))))
 
-(defn print-source [x * [bg "dark"] [linenos False]]
-  "Pretty-print the source code of a module or function, with syntax highlighting."
-  (let [details (get-source-details x)
+(defn print-source [obj * [bg "dark"] [linenos False]]
+  "Pretty-print the source code of module or function obj, with syntax highlighting. bg is dark or light."
+  (let [details (get-source-details obj)
         padding (if linenos "      " "")
-        header f"{padding}{x}, module {(:module details)}\n{padding}File {(:file details)}, line {(:line details)}"
+        header f"{padding}{obj}, module {(:module details)}\n{padding}File {(:file details)}, line {(:line details)}"
         lexer (get-lexer-by-name (:language details))
         formatter (TerminalFormatter :linenos linenos
                                      :bg bg
                                      :stripall True)]
+    ;; modify formatter so that line numbers correspond to the source
     (setv formatter._lineno (:line details))
     (print)
     (print header)
     (unless linenos (print))
-    (print (highlight (get-source x) lexer formatter))))
+    (print (highlight (get-source obj) lexer formatter))))
 
 (defn interact []
-  "Interact with code from called point."
-  (let [repl (REPL :locals (| (globals) (locals)))]
+  "Interact with code from called point by starting a nested REPL
+  with the same local variables as the calling scope.
+
+  This is useful for debugging by running within the context of a calling
+  function. The local variables can be used in the REPL and the behaviour
+  of the code can be observed and modified as needed."
+  (let [repl (REPL :locals (locals))]
+    ;; give the nested REPL an extended prompt by setting sys.ps*
     (setv old-ps1 sys.ps1
           old-ps2 sys.ps2
           sys.ps1 (+ "=" sys.ps1)
           sys.ps2 (+ "." sys.ps2))
-    (.interact repl f"{_ansi.GREEN}nested REPL - ctrl-D to exit.{_ansi.reset}")
-    (setv sys.ps1 old-ps1
-          sys.ps2 old-ps2)))
+    (try
+      (.interact repl f"{_ansi.GREEN}nested REPL - ctrl-D to exit.{_ansi.reset}")
+      (finally
+        (setv sys.ps1 old-ps1
+              sys.ps2 old-ps2)))))
     
 (defn hylight [s * [bg "dark"] [language "hylang"]]
   "Syntax highlight a Hy (or other language) string. This is nice for use in the repl - put
