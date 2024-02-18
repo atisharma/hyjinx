@@ -23,8 +23,7 @@ Copy this somewhere and set HYSTARTUP to its location."
 ;; * repl exception hook
 ;; ----------------------------------------------------
 
-(import hyjinx.source [inject-exception-hook])
-(inject-exception-hook :lines-around 4
+(hyjinx.inject-exception-hook :lines-around 4
                        :ignore ["/hy/repl.py"
                                 "/hy/importer.py"
                                 "/hy/compiler.py"
@@ -32,25 +31,29 @@ Copy this somewhere and set HYSTARTUP to its location."
                                 "/funcparserlib/parser.py"
                                 "/multimethod/__init__.py"])
 
+
 ;; * hyjinx utilities
 ;; ----------------------------------------------------
 
-(import hyjinx.lib [! edit pp slurp spit])
-(import hyjinx.docs [hy-doc hyrule-doc])
-(require hyjinx.macros *)
+(require hyjinx *)
+(import hyjinx [! shell mkdir cd ls edit
+                pp slurp spit re-grep
+                take
+                jload jsave
+                hy-doc hyrule-doc])
 
 ;; * numpy-related things
 ;; ----------------------------------------------------
 
 (try
   (import numpy)
-  (import hyjinx.mat [ppa])
+  (import hyjinx [ppa])
   (except [ModuleNotFoundError]))
 
 ;; * repl code introspection and discussion
 ;; ----------------------------------------------------
 
-(import hyjinx.source [edit-source get-source print-source interact])
+(import hyjinx [edit-source get-source print-source interact])
 
 (try
   (import hyjinx [llm])
@@ -60,8 +63,7 @@ Copy this somewhere and set HYSTARTUP to its location."
 ;; ----------------------------------------------------
 
 (try
-  (import hyjinx.source [hylight])
-  (setv repl-output-fn hylight)
+  (setv repl-output-fn hyjinx.hylight)
   (except [NameError]
     (setv repl-output-fn (partial pformat :indent 2))))
 
@@ -76,14 +78,14 @@ Copy this somewhere and set HYSTARTUP to its location."
 
 (setv (get os.environ "HY_HISTORY") ".hy-history")
 
-;; * banner - confirm hyrc finished loading
+;; * banner - confirm hyrc loaded successfully
 ;; ----------------------------------------------------
 
 (setv hy.repl.REPL.banner
       (fn [self]
         (.format "🦑 Hy(+jinx) {version}(+{hjv}) using {py}({build}) {pyversion} on {os}"
                  :version hy.__version__
-                 :hjv (get (.split hyjinx.__version__ "." 2))
+                 :hjv (get hyjinx.__version_info__ 2)
                  :py (platform.python_implementation)
                  :build (get (platform.python_build) 0)
                  :pyversion (platform.python_version)

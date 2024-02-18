@@ -22,7 +22,7 @@ Starts the socket on import.
 (setv N_CONCURRENT_CLIENTS 1000
       BACKGROUND_TICK 1)
 
-(setv conf (config "server.toml")
+(setv _conf (config "server.toml")
       context (zmq.asyncio.Context)
       socket (.socket context zmq.ROUTER))
 
@@ -36,7 +36,7 @@ Starts the socket on import.
   (.bind socket address)
   socket)
 
-(setv frontend (start-router-socket (:listen conf)))
+(setv frontend (start-router-socket (:listen _conf)))
 
 
 (defn/a send [zmsg]

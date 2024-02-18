@@ -17,7 +17,6 @@
 (import hyjinx.lib [mkdir slurp])
 
 
-
 (defn _install_docs [tarball-url package * [extension ".rst"]]
   "Download a local copy of some specific documentation."
   (let [cachedir (user-cache-dir __package__ __name__)

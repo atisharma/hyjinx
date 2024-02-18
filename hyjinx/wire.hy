@@ -6,7 +6,7 @@
 (import uuid [uuid1])
 (import zstandard [compress decompress])
 
-(import hyjinx.crypto)
+(import hyjinx [crypto])
 (import hyjinx.lib [config hash-id])
 
 

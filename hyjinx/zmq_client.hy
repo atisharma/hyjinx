@@ -12,20 +12,20 @@ Starts the socket on import.
 (import hyjinx.lib [config])
 
 
-(setv context (zmq.Context))
+(setv _context (zmq.Context))
 
-(setv conf (config "client.toml")
+(setv _conf (config "client.toml")
       REQUEST_TIMEOUT_S 20
-      context (zmq.Context))
+      _context (zmq.Context))
 
 (defn start-socket []
-  (setv socket (.socket context zmq.REQ))
+  (setv socket (.socket _context zmq.REQ))
   ; see https://stackoverflow.com/questions/26915347/zeromq-reset-req-rep-socket-state
   (.setsockopt socket zmq.RCVTIMEO (* REQUEST_TIMEOUT_S 1000))
   (.setsockopt socket zmq.REQ_CORRELATE 1)
   (.setsockopt socket zmq.REQ_RELAXED 1)
   (.setsockopt socket zmq.LINGER 1000)
-  (.connect socket f"tcp://{(:server conf)}:{(:port conf)}")
+  (.connect socket f"tcp://{(:server _conf)}:{(:port _conf)}")
   socket)
 
 (setv socket (start-socket))
