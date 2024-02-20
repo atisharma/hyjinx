@@ -9,7 +9,7 @@ A smorgasbord of useful functions.
 
 (import functools *
         itertools *
-        cytoolz [first second last partition identity]
+        cytoolz [first second last drop partition identity]
         hyrule [flatten pformat pp :as hyrule-pp])
 
 (import json
@@ -32,10 +32,22 @@ A smorgasbord of useful functions.
 ;; ----------------------------------------------------
 
 (defn named-partial [f #* args #** kwargs]
-  "functools.partial, but with a new function name set."
+  "Just functools.partial, but with a new function name set."
   (setv f-partial (partial f #* args #** kwargs))
   (setv f-partial.__name__ (.join "_" [(name f) #*(map str args) #*(map str (flatten (.items kwargs)))]))
   f-partial)
+
+(defn compose [#* funcs]
+  "Function composition, f ∘ g.
+  E.g., after
+  (setv fg (compose f g)).
+  then
+  (f (g x)) is equivalent to (fg x).
+  Arguments must have compatible input/output matchings."
+  (reduce
+    (fn [f g]
+      (fn [#* args #** kwargs] (f (g #* args #** kwargs))))
+    funcs))
 
 ;; * Time and date
 ;; ----------------------------------------------------
@@ -63,7 +75,7 @@ A smorgasbord of useful functions.
      stdout))
 
 (defn cd [path]
-  "Change directory."
+  "Change working directory."
   (os.chdir path))
 
 (defn ls [[path None]]

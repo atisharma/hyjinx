@@ -12,8 +12,7 @@ Copy this somewhere and set HYSTARTUP to its location."
         platform
         subprocess)
 (import hyrule [pformat])
-(import functools [partial]
-        cytoolz [first second last identity])
+(import functools [partial])
 (import importlib [reload])
 (import pydoc [pager])
 
@@ -24,12 +23,13 @@ Copy this somewhere and set HYSTARTUP to its location."
 ;; ----------------------------------------------------
 
 (hyjinx.inject-exception-hook :lines-around 4
-                       :ignore ["/hy/repl.py"
-                                "/hy/importer.py"
-                                "/hy/compiler.py"
-                                "/hy/macros.py"
-                                "/funcparserlib/parser.py"
-                                "/multimethod/__init__.py"])
+                              :limit 5
+                              :ignore ["/hy/repl.py"
+                                       "/hy/importer.py"
+                                       "/hy/compiler.py"
+                                       "/hy/macros.py"
+                                       "/funcparserlib/parser.py"
+                                       "/multimethod/__init__.py"])
 
 
 ;; * hyjinx utilities
@@ -38,7 +38,8 @@ Copy this somewhere and set HYSTARTUP to its location."
 (require hyjinx *)
 (import hyjinx [! shell mkdir cd ls edit
                 pp slurp spit re-grep
-                take
+                take chain repeat reduce
+                first second last identity
                 jload jsave
                 hy-doc hyrule-doc])
 

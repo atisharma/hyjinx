@@ -6,8 +6,8 @@ Convenience things for ndarrays, matrices and numerical data.
                  -> ->> as->])
 
 (import hyrule [inc dec])
-(import functools [reduce partial]
-        cytoolz [last])
+(import hyjinx [first last prod])
+(import functools [reduce partial])
 
 (import numpy)
 (import numpy [ndarray])
@@ -54,7 +54,7 @@ Convenience things for ndarrays, matrices and numerical data.
 (defn _pformat-array [#^ ndarray a * [precision 3] [digits None] [thou-sep ","] [suppress-small True] [formatter None]]
   "Wrap sub-array (matrix) with a border and return a string."
   (let [digits (+ 4
-                  (or digits (int (numpy.log10 (numpy.max (abs a))))))
+                  (or digits (int (numpy.log10 (numpy.max (abs (get a (numpy.isfinite a))))))))
         formatter (or formatter {"float_kind" (fn [x] f" {x :=+{(+ precision digits)}_.{precision}f} ")
                                  "int_kind" (fn [x] f" {x :=+{digits}_d} ")})
                                  ;"complex_kind" (fn [x] f" {x :=+{(+ precision digits)}_.{precision}f} ")})

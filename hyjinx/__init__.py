@@ -1,7 +1,7 @@
 """
 # 🦑 Hyjinx
 
-*Functions and macros useful for modern living in the Hy REPL.*
+*Functions and macros for modern living in the Hy REPL.*
 
 hyjinx.lib - a smorgasbord of convenience functions.
 hyjinx.source - code inspection.

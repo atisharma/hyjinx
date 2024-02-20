@@ -1,5 +1,24 @@
 "
 A Large Language Model in your repl.
+
+A Hy implementation of a large language model assistant
+to perform various tasks like generating code comments,
+providing explanations, and performing code review.
+
+The functions included in this module are:
+
+- converse: Traditional chat over a list of messages, which are updated in-place.
+- definstruct: Create methods to instruct over python/hy objects. Used to write:
+  - comments
+  - docstring
+  - explain
+  - review
+  - rewrite
+  - test
+- instruct: Generic instruction method for the assistant.
+- TabbyClient class: Implementation of a client to interact with TabbyAPI.
+- various functions to manage the TabbyAPI server (load models, templates etc).
+
 "
 
 (require hyrule [-> ->> unless of])
@@ -12,7 +31,6 @@ A Large Language Model in your repl.
 (import httpx shutil)
 (import types [ModuleType FunctionType MethodType TracebackType])
 (import itertools [tee])
-(import multimethod [multimethod])
 (import openai [OpenAI])
 (import json.decoder [JSONDecodeError])
 (import pansi [ansi :as _ansi])
@@ -92,8 +110,8 @@ A Large Language Model in your repl.
         language (:language details)
         source (get-source obj)
         sys (_system system-prompt)
-        usr (_user f"{prompt} The code is in the {language} language.
-{obj}, module {(:module details)}, file {(:file details)}, line {(:line details)}
+        usr (_user f"You will be shown code for {obj} (module {(:module details)}). It is in the {language} language.
+{prompt}
 
 {source}")
         stream (_completion client [sys usr] :max-tokens max-tokens #** kwargs)]
@@ -105,7 +123,7 @@ A Large Language Model in your repl.
 
 (definstruct explain "Clearly explain the purpose of the following code.")
 
-(definstruct review "Give a high-quality peer-review of the following code. Identify any bugs, logic errors, and overlooked edge cases. Briefly explain your reasoning. Concentrate on the most important points first.")
+(definstruct review "Write a clear, high-quality peer-review of the following code. Identify any bugs, logic errors, and overlooked edge cases. Briefly explain your reasoning. Concentrate on the most important points first.")
 
 (definstruct rewrite "Rewrite the following code in the same language, improving quality and clarity. Briefly state what you will do before giving the rewritten code.")
 
@@ -180,6 +198,7 @@ A Large Language Model in your repl.
 
   (defn __init__ [self #** kwargs]
     "base-url should have the 'v1' at the end."
+    (setv self.model None)
     (setv self.admin_key (.pop kwargs "admin_key" None))
     (.__init__ (super) #** kwargs))
 
@@ -189,7 +208,7 @@ A Large Language Model in your repl.
                               :headers {"x-api-key" self.api-key})]
       (if response.is-success
           (response.json)
-          (raise (TabbyClientError f"{response.status-code}\n{(pformat (:detail (response.json)) :indent 2)}")))))
+          (raise (TabbyClientError f"{_ansi.red}{response.status-code}\n{(pformat (:detail (response.json)) :indent 2)}{_ansi.reset}")))))
 
   (defn _post [self endpoint * [admin False] #** data]
     "POST to an authenticated endpoint or raise error."
@@ -204,7 +223,7 @@ A Large Language Model in your repl.
             (.json response)
             (except [e [JSONDecodeError TypeError]]
               response))
-          (raise (TabbyClientError f"{response.status-code}\n{(pformat (:detail (response.json)) :indent 2)}"))))))
+          (raise (TabbyClientError f"{_ansi.red}{response.status-code}\n{(pformat (:detail (response.json)) :indent 2)}{_ansi.reset}"))))))
 
 ;; * generation methods requiring user authentication
 ;; ----------------------------------------------------

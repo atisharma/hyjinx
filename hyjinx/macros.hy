@@ -1,4 +1,6 @@
-"Convenience macros."
+"
+Convenience macros.
+"
 
 ;; * macros about macros
 ;; ----------------------------------------------------
@@ -21,7 +23,7 @@
   `(cut ~xs 1 None))
   
 (defmacro .. [a b [step 1]]
-  "A realised (eager) range, a to b inclusive."
+  "A realised (eager) range, [a b) (i.e. excluding right boundary)."
   `(list (range ~a ~b ~step)))
 
 (defmacro prepend [x l]
@@ -42,7 +44,7 @@
   (defmethod f [#^ int x #^ float y]
     (// x (int y)))
 
-  will compile to the following python code:
+  is equivalent to the following python code:
 
   @multimethod
   def f(x: int, y: float):
@@ -51,6 +53,20 @@
   `(defn [hy.I.multimethod.multimethod] ~f
      ~@body))
 
+(defmacro defproperty [f #* body]
+  "Function definition using the property decorator.
+
+  (defproperty p
+    2)
+
+  is equivalent to
+
+  @property
+  def p(self):
+    2
+  "
+  `(defn [property] ~f [self] ~@body))
+  
 ;; * macros for data structures
 ;; ----------------------------------------------------
 
@@ -58,9 +74,9 @@
   "Define a basic immutable dataclass.
   For example, the Hy code
 
-  (defdataclass D [#^ int x #^ float y]
+  (defdataclass D [#^ int x #^ float y])
 
-  will compile to
+  is equivalent to
 
   @dataclass
   class D:

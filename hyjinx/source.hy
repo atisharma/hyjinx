@@ -118,14 +118,15 @@ Utilities for code inspection and presentation.
     (unless linenos (print))
     (print (highlight (get-source obj) lexer formatter))))
 
-(defn interact []
+(defn interact [[variables None]]
   "Interact with code from called point by starting a nested REPL
   with the same local variables as the calling scope.
 
   This is useful for debugging by running within the context of a calling
   function. The local variables can be used in the REPL and the behaviour
   of the code can be observed and modified as needed."
-  (let [repl (REPL :locals (locals))]
+  ;; TODO : automatically pull vars of calling scope
+  (let [repl (REPL :locals (or variables (globals)))]
     ;; give the nested REPL an extended prompt by setting sys.ps*
     (setv old-ps1 sys.ps1
           old-ps2 sys.ps2
