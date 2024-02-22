@@ -1,30 +1,62 @@
 "
-Convenience macros.
+This module, hyjinx.macros, provides a collection of convenient
+macros for various use cases in Hy programming.
+
+## Macros about Macros
+
+- `delmacro`: Delete or unregister a macro.
+- `help-macro`: Retrieve help or documentation for a macro.
+
+## Macros for sequences
+
+- `rest`: Return a slice of all but the first element in a sequence.
+- `butlast`: Return a slice of all but the last element in a sequence.
+- `..`: Generate a realised range for a sequence.
+- `prepend`: Prepend an element to a sequence.
+- `append`: Append an element to a sequence.
+
+## Macros for Functions
+
+- `defmethod`: Dispatch on type using multimethod.multimethod.
+- `defproperty`: Define a class method using the property decorator.
+
+## Macros for Data Structures
+
+- `defstruct`: Define a basic immutable dataclass.
+
+## Macros for Flow Control
+
+- `do-while`: A C-style do-while loop.
+
 "
 
 ;; * macros about macros
 ;; ----------------------------------------------------
 
-(defmacro delmacro [m]
-  "Delete a macro."
+(defmacro delmacro [macro]
+  "Delete / unregister a macro."
   `(eval-when-compile
-     (del (get _hy_macros (hy.mangle m)))))
+     (del (get _hy_macros (hy.mangle macro)))))
   
-(defmacro help-macro [m]
+(defmacro help-macro [macro]
   "Get help for a macro.
   Use like (help-macro 'help-macro)."
-  `(help (get-macro ~m)))
+  `(help (get-macro ~macro)))
   
 ;; * macros for sequences
 ;; ----------------------------------------------------
 
 (defmacro rest [xs]
-  "A slice of all but the last of xs."
+  "A slice of all but the first of xs."
   `(cut ~xs 1 None))
   
-(defmacro .. [a b [step 1]]
-  "A realised (eager) range, [a b) (i.e. excluding right boundary)."
-  `(list (range ~a ~b ~step)))
+(defmacro butlast [xs]
+  "A slice of all but the last of xs."
+  `(cut ~xs 0 -1))
+  
+(defmacro .. [start end [step 1]]
+  "A realised (eager) range, [start end) (i.e. excluding right boundary)."
+  `(list (range ~start ~end ~step)))
 
 (defmacro prepend [x l]
   "Return a new list with x prepended."
@@ -54,7 +86,7 @@ Convenience macros.
      ~@body))
 
 (defmacro defproperty [f #* body]
-  "Function definition using the property decorator.
+  "Class method definition using the property decorator.
 
   (defproperty p
     2)

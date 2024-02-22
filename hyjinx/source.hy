@@ -5,6 +5,7 @@ Utilities for code inspection and presentation.
 (require hyrule [-> ->> unless])
 
 (import hyrule [inc dec pformat])
+(import hyjinx [first second last])
 (import hy.compiler [hy-compile])
 (import hy.repl [REPL])
 
@@ -17,7 +18,7 @@ Utilities for code inspection and presentation.
 (import pygments.formatters [TerminalFormatter])
 (import pansi [ansi :as _ansi])
 
-(import inspect [ismodule getsource getsourcefile])
+(import inspect [currentframe ismodule getmodule getsource getsourcefile stack])
 
 (import hyjinx.lib [slurp])
 
@@ -46,30 +47,34 @@ Utilities for code inspection and presentation.
     (try
       (subprocess.run [(.replace editor "{line}" (str line)) (getsourcefile obj)] :check True))))
 
+(defn _get-lang-from-filename [filename]
+  "Guess the language from the filename extension."
+  (match (last (.split filename "."))
+    "py" "python"
+    "hy" "hylang"
+    "pytb" "pytb"
+    "py3tb" "py3tb"))
+
 (defn get-source-details [obj]
   "Get line number, source file of obj."
   (let [file (getsourcefile obj)
         module (cond (ismodule obj) obj.__name__
                      :else obj.__module__)
-        ext (cut file -3 None)
-        lang (match ext
-                    ".py" "python"
-                    ".hy" "hylang"
-                    ".pytb" "pytb"
-                    ".py3tb" "py3tb")
+        ext (last (.split file "."))
+        lang (_get-lang-from-filename file)
         ;; TODO : handle classes
-        lnum (if (and (hasattr obj "__code__")
-                      (hasattr obj.__code__ "co_firstlineno"))
-                 (- obj.__code__.co-firstlineno 1)
-                 0)]
-      {"line" lnum
+        lineno (if (and (hasattr obj "__code__")
+                        (hasattr obj.__code__ "co_firstlineno"))
+                   (- obj.__code__.co-firstlineno 1)
+                   0)]
+      {"line" lineno
        "module" module
        "file" file
        "language" lang
        "extension" ext}))
 
-(defn _get-lines [fname line-number]
-  (let [source (slurp fname)
+(defn _get-lines [filename line-number]
+  (let [source (slurp filename)
         lines (.split source "\n")
         rest-lines (cut lines line-number None)
         defn-lines []
@@ -88,10 +93,10 @@ Utilities for code inspection and presentation.
   (let [details (get-source-details obj)
         file (:file details)
         module (:module details)
-        lnum (:line details)]
+        lineno (:line details)]
     ;; TODO : handle classes
-    (if lnum
-        (_get-lines file lnum)
+    (if lineno
+        (_get-lines file lineno)
         (slurp file))))
 
 (defn get-source [obj]
@@ -102,11 +107,11 @@ Utilities for code inspection and presentation.
           (= lang "hylang") (get-hy-source obj)
           :else (raise (NotImplementedError f"Filetype {(:extension details)} is unknown.")))))
 
-(defn print-source [obj * [bg "dark"] [linenos False]]
+(defn print-source [obj * [bg "dark"] [linenos False] [details None]]
   "Pretty-print the source code of module or function obj, with syntax highlighting. bg is dark or light."
   (let [details (get-source-details obj)
         padding (if linenos "      " "")
-        header f"{padding}{obj}, module {(:module details)}\n{padding}File {(:file details)}, line {(:line details)}"
+        header f"{padding}{obj}, module {(:module details)}\n{padding}File {_ansi.b}{(:file details)}{_ansi._b}, line {(:line details)}"
         lexer (get-lexer-by-name (:language details))
         formatter (TerminalFormatter :linenos linenos
                                      :bg bg
@@ -118,23 +123,32 @@ Utilities for code inspection and presentation.
     (unless linenos (print))
     (print (highlight (get-source obj) lexer formatter))))
 
-(defn interact [[variables None]]
+(defn interact []
   "Interact with code from called point by starting a nested REPL
   with the same local variables as the calling scope.
 
   This is useful for debugging by running within the context of a calling
   function. The local variables can be used in the REPL and the behaviour
-  of the code can be observed and modified as needed."
-  ;; TODO : automatically pull vars of calling scope
-  (let [repl (REPL :locals (or variables (globals)))]
+  of the code can be observed and modified as needed.
+
+  This is only expected to work in CPython."
+  (let [caller-frame (. (currentframe) f-back)
+        caller caller-frame.f-code.co-name
+        lineno (- caller-frame.f-lineno 1)
+        filename caller-frame.f-code.co-filename
+        lang (_get-lang-from-filename filename)
+        module (get caller-frame.f-globals "__name__")
+        repl (REPL :locals caller-frame.f-locals)]
     ;; give the nested REPL an extended prompt by setting sys.ps*
     (setv old-ps1 sys.ps1
           old-ps2 sys.ps2
-          sys.ps1 (+ "=" sys.ps1)
-          sys.ps2 (+ "." sys.ps2))
+          sys.ps1 (+ _ansi.GREEN module "." caller " " sys.ps1 _ansi.reset)
+          sys.ps2 (+ _ansi.RED module "." caller "." sys.ps2 _ansi.reset))
     (try
-      (.interact repl f"{_ansi.GREEN}nested REPL - ctrl-D to exit.{_ansi.reset}")
+      (.interact repl f"{_ansi.GREEN}nested REPL {caller} - ctrl-D to exit.
+File {_ansi.b}{filename}{_ansi._b}, line {lineno}{_ansi.reset}")
       (finally
+        (del caller-frame)
         (setv sys.ps1 old-ps1
               sys.ps2 old-ps2)))))
     
@@ -159,7 +173,7 @@ Utilities for code inspection and presentation.
   "Exception hook for syntax highlighted traceback.
   Install using inject-exception-hook, or with
     (setv sys.excepthook (partial exception-hook :lines-around 3 :ignore [\"hy/repl.py\"]
-  (note the use of `partial` to set options) or simply with
+  (note the use of partial to set options) or simply with
     (setv sys.excepthook exception-hook)
   if you're happy with the defaults."
   (setv _tb tb
@@ -167,13 +181,11 @@ Utilities for code inspection and presentation.
         filename "")
   (while _tb
     (setv filename _tb.tb_frame.f_code.co_filename
-          ext (cut filename -3 None)
-          lang (match ext
-                      ".py" "python"
-                      ".hy" "hylang"
-                      _ None))
+          ext (last (.split filename "."))
+          lang (_get-lang-from-filename filename))
     ;; code for top frame
-    (if (and lang (not (any (map filename.endswith ignore))))
+    (if (and lang
+             (not (any (map filename.endswith ignore))))
       (let [source (slurp filename)
             lineno _tb.tb-lineno
             lines (cut (.split source "\n") (- lineno lines-around) (+ lineno lines-around))

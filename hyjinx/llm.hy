@@ -1,23 +1,41 @@
 "
 A Large Language Model in your repl.
 
-A Hy implementation of a large language model assistant
-to perform various tasks like generating code comments,
-providing explanations, and performing code review.
+APIs and utilities for interacting with a Large Language Model (LLM)
+assistant in Hylang.
 
-The functions included in this module are:
+This module provides functions to interact with a Large Language Model
+assistant for various tasks such as generating code comments,
+providing explanations, performing code review, and rewriting code.
+It includes a Hy implementation of a TabbyClient to interact with
+TabbyAPI for model management and streaming completions.
 
-- converse: Traditional chat over a list of messages, which are updated in-place.
-- definstruct: Create methods to instruct over python/hy objects. Used to write:
-  - comments
-  - docstring
-  - explain
-  - review
-  - rewrite
-  - test
+Features:
+- converse: Chat over a list of messages, updating the message list in-place.
+- definstruct: Create methods for instructing over python/hy objects.
 - instruct: Generic instruction method for the assistant.
-- TabbyClient class: Implementation of a client to interact with TabbyAPI.
-- various functions to manage the TabbyAPI server (load models, templates etc).
+- TabbyClient: Implementation of a client to interact with TabbyAPI for model management and
+  streaming completions.
+
+Functions:
+- `converse`: Chat over a list of messages and update in-place the message list.
+- `definstruct`: A macro to create functions for specific tasks like
+  comments, docstrings, explanations, review, rewrite, and test
+  (these examples have been implemented)
+- `instruct`: Generic instruction method for the assistant.
+- Various methods for managing TabbyAPI servers, such as loading models, templates, LoRAs
+  and configuring the client.
+
+The TabbyClient class:
+- `models`: List all models available to TabbyAPI or OpenAI.
+- `model-load`: Set the currently loaded model (TabbyAPI).
+- `model-unload`: Unload the currently loaded model (TabbyAPI).
+- `templates`: List all templates available to TabbyAPI.
+- `template-load`: Set the currently loaded template (TabbyAPI).
+- `template-unload`: Unload the currently loaded template (TabbyAPI).
+- `loras`: List all LoRAs available to TabbyAPI.
+- `lora-load`: Load LoRAs when using TabbyAPI.
+- `lora-unload`: Unload LoRA when using TabbyAPI.
 
 "
 
@@ -197,7 +215,8 @@ The functions included in this module are:
   "A REPL-facing client for TabbyAPI (https://github.com/theroyallab/tabbyAPI)."
 
   (defn __init__ [self #** kwargs]
-    "base-url should have the 'v1' at the end."
+    "The base-url should have the 'v1' at the end.
+     Initialise as for OpenAI, but optionally pass admin_key as well."
     (setv self.model None)
     (setv self.admin_key (.pop kwargs "admin_key" None))
     (.__init__ (super) #** kwargs))
@@ -249,7 +268,9 @@ The functions included in this module are:
 
 (defmethod loras [#^ TabbyClient client]
   "List all loras available to TabbyAPI."
-  (:data (client._get "loras")))
+  (let [loras (:data (client._get "loras"))]
+    (sorted (lfor l loras {"name" (:id l) #** l})
+            :key :name)))
 
 (defmethod models [#^ OpenAI client]
   "List all models available to OpenAI."
@@ -262,7 +283,7 @@ The functions included in this module are:
     
 (defmethod lora [#^ TabbyClient client]
   "Get the currently loaded loras."
-  (:data (.json (client._get "lora"))))
+  (client._get "lora"))
 
 (defmethod templates [#^ TabbyClient client]
   "List all templates available to TabbyAPI."
@@ -305,13 +326,13 @@ The functions included in this module are:
   (setv client.model None))
 
 (defmethod lora-load [#^ TabbyClient client #^ list loras]
-  "Load LoRas when using TabbyAPI.
+  "Load LoRAs when using TabbyAPI.
   loras is a list of dicts, with 'name', 'scaling' as keys."
   (client._post "lora/load"
                 :admin True
                 :loras loras))
     
 (defmethod lora-unload [#^ TabbyClient client]
-  "Unload LoRas when using TabbyAPI."
+  "Unload LoRAs when using TabbyAPI."
   (client._post "lora/unload"
                 :admin True))

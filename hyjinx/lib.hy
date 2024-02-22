@@ -21,6 +21,7 @@ A smorgasbord of useful functions.
         subprocess
         sys)
 
+(import importlib [reload])
 (import pathlib [Path])
 (import datetime [datetime])
 
@@ -30,6 +31,10 @@ A smorgasbord of useful functions.
 
 ;; * Functions
 ;; ----------------------------------------------------
+
+(defn mreload [#* modules]
+  "Reload a list of modules in order."
+  (list (map reload modules)))
 
 (defn named-partial [f #* args #** kwargs]
   "Just functools.partial, but with a new function name set."
