@@ -12,16 +12,16 @@ TabbyAPI for model management and streaming completions.
 
 Features:
 - converse: Chat over a list of messages, updating the message list in-place.
-- definstruct: Create methods for instructing over python/hy objects.
+- definstruct: A macro to create functions for specific tasks like
+  comments, docstrings, explanations, review, rewrite, and test
+  (these examples have been implemented)
 - instruct: Generic instruction method for the assistant.
 - TabbyClient: Implementation of a client to interact with TabbyAPI for model management and
   streaming completions.
 
 Functions:
 - `converse`: Chat over a list of messages and update in-place the message list.
-- `definstruct`: A macro to create functions for specific tasks like
-  comments, docstrings, explanations, review, rewrite, and test
-  (these examples have been implemented)
+- `definstruct`: Create methods for instructing over python/hy objects.
 - `instruct`: Generic instruction method for the assistant.
 - Various methods for managing TabbyAPI servers, such as loading models, templates, LoRAs
   and configuring the client.
@@ -36,6 +36,32 @@ The TabbyClient class:
 - `loras`: List all LoRAs available to TabbyAPI.
 - `lora-load`: Load LoRAs when using TabbyAPI.
 - `lora-unload`: Unload LoRA when using TabbyAPI.
+
+Example usage:
+
+```hylang
+(import hyjinx [llm])
+(import yaml)
+
+(setv auth (with [f (open  \"/srv/tabby-api/api_tokens.yml\" \"r\")]
+             (yaml.safe-load f)))
+(setv tabby (llm.TabbyClient :base-url \"http://localhost:5000/v1\" #** auth))
+
+; tidy up the namespace
+(del yaml)
+(del auth)
+
+; set up a chat with memory
+(setv _tabby_messages [])
+(setv tchat (partial llm.converse tabby _tabby_messages))
+
+; load a code-literate model
+(llm.model-load tabby \"CodeFuse-DeepSeek-33B-6.0bpw-h6-exl\")
+(llm.template-load tabby \"alpaca\")
+
+; get the llm to explain the llm module
+(llm.explain tabby llm)
+```
 
 "
 
@@ -64,7 +90,6 @@ The TabbyClient class:
 
 (defmethod converse [#^ OpenAI client #^ (of list dict) messages #^ str content *
                      [system-prompt "You are an intelligent and concise assistant."]
-                     [max-tokens 1000]
                      [color None]
                      #** kwargs]
   "Chat over a list of messages and update in-place the message list.
@@ -81,7 +106,6 @@ The TabbyClient class:
         [output-1 output-2] (tee (_completion
                                    client
                                    [sys #* messages usr]
-                                   :max-tokens max-tokens
                                    #** kwargs))]
     (_output output-1
              :print True
@@ -106,13 +130,12 @@ The TabbyClient class:
                      [margin "  "]
                      [width None]
                      [system-prompt "You are an intelligent and concise assistant."]
-                     [max-tokens 1000]
                      [color _ansi.reset]
                      #** kwargs]
   "Just ask a general instruction or question, no object, no chat."
   (let [sys (_system system-prompt)
         usr (_user prompt)
-        stream (_completion client [sys usr] :max-tokens max-tokens #** kwargs)]
+        stream (_completion client [sys usr] #** kwargs)]
     (_output stream :print print :width width :margin margin :color color)))
 
 (defmethod instruct [#^ OpenAI client #^ str prompt #^ HasCodeType obj *
@@ -120,7 +143,6 @@ The TabbyClient class:
                      [margin "  "]
                      [width None]
                      [system-prompt  "You are an intelligent, expert and concise senior programmer."]
-                     [max-tokens 1000]
                      [color _ansi.reset]
                      #** kwargs]
   "Instruct a hy or python object's source code."
@@ -132,7 +154,7 @@ The TabbyClient class:
 {prompt}
 
 {source}")
-        stream (_completion client [sys usr] :max-tokens max-tokens #** kwargs)]
+        stream (_completion client [sys usr] #** kwargs)]
     (_output stream :print print :width width :margin margin :color color)))
 
 (definstruct comments "Rewrite the following code, with high-quality comments.")
@@ -147,11 +169,12 @@ The TabbyClient class:
 
 (definstruct test "Write a high-quality test for the following code.")
 
+(definstruct example "Give a minimal and correct example usage for the following code.")
+
 ;; * message convenience functions
 ;; -----------------------------------------------------------------------------
 
-(defn _msg [#^ str role
-            #^ str content]
+(defn _msg [#^ str role #^ str content]
   "Just a simple dict with the needed fields."
   (if content
       {"role" role
@@ -212,13 +235,21 @@ The TabbyClient class:
 ;; ----------------------------------------------------
 
 (defclass TabbyClient [OpenAI]
-  "A REPL-facing client for TabbyAPI (https://github.com/theroyallab/tabbyAPI)."
+  "A REPL-facing client for TabbyAPI (https://github.com/theroyallab/tabbyAPI).
+
+  The `TabbyClient` class provides a client to interact with TabbyAPI
+  for model management and streaming completions. It provides methods
+  to load, unload, and manage models, as well as other useful features
+  such as streaming completions and handling templates and LoRAs. An
+  admin key is required for some endpoints.
+
+  Methods are defined at the module level."
 
   (defn __init__ [self #** kwargs]
     "The base-url should have the 'v1' at the end.
      Initialise as for OpenAI, but optionally pass admin_key as well."
     (setv self.model None)
-    (setv self.admin_key (.pop kwargs "admin_key" None))
+    (setv self._admin_key (.pop kwargs "admin_key" None))
     (.__init__ (super) #** kwargs))
 
   (defn _get [self endpoint]
@@ -232,7 +263,7 @@ The TabbyClient class:
   (defn _post [self endpoint * [admin False] #** data]
     "POST to an authenticated endpoint or raise error."
     (let [auth (if admin
-                   {"x-admin-key" self.admin-key}
+                   {"x-admin-key" self._admin-key}
                    {"x-api-key" self.api-key})
           response (httpx.post (.join self.base-url endpoint)
                                :headers auth
@@ -247,7 +278,7 @@ The TabbyClient class:
 ;; * generation methods requiring user authentication
 ;; ----------------------------------------------------
 
-(defmethod _completion [#^ OpenAI client messages * [stream True] #** kwargs]
+(defmethod _completion [#^ OpenAI client messages * [stream True] [max-tokens 1000] #** kwargs]
   "Generate a streaming completion using the chat completion endpoint.
   In python, use as
         for chunk in stream:
@@ -256,10 +287,16 @@ The TabbyClient class:
     :model (.pop kwargs "model" (getattr client "model" "gpt-4-turbo-preview"))
     :messages messages
     :stream stream
+    :max-tokens max-tokens
     #** kwargs))
 
 ;; * methods requiring user authentication
 ;; ----------------------------------------------------
+
+(defmethod models [#^ OpenAI client]
+  "List all models available to OpenAI."
+  (let [models (client.models.list)]
+    (lfor m models m.id)))
 
 (defmethod models [#^ TabbyClient client]
   "List all models available to TabbyAPI."
@@ -272,14 +309,15 @@ The TabbyClient class:
     (sorted (lfor l loras {"name" (:id l) #** l})
             :key :name)))
 
-(defmethod models [#^ OpenAI client]
-  "List all models available to OpenAI."
-  (let [models (client.models.list)]
-    (lfor m models m.id)))
+(defmethod model [#^ OpenAI client]
+  "Get the currently selected model."
+  {"id" client.model})
 
 (defmethod model [#^ TabbyClient client]
   "Get the currently loaded model."
-  (client._get "model"))
+  (let [response (client._get "model")]
+    (setv client.model (:id response))
+    response))
     
 (defmethod lora [#^ TabbyClient client]
   "Get the currently loaded loras."
@@ -331,6 +369,11 @@ The TabbyClient class:
   (client._post "lora/load"
                 :admin True
                 :loras loras))
+    
+(defmethod lora-load [#^ TabbyClient client #^ str lora * [scaling 1.0]]
+  "Load a single LoRA when using TabbyAPI.
+  lora is the name of the lora. Scaling defaults to 1.0."
+  (lora-load client [{"name" lora "scaling" scaling}]))
     
 (defmethod lora-unload [#^ TabbyClient client]
   "Unload LoRAs when using TabbyAPI."

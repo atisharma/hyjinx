@@ -66,6 +66,10 @@ macros for various use cases in Hy programming.
   "Return a new list with x appended."
   `(+ ~l [~x]))
 
+(defmacro lmap [#* args]
+  "Eager map, realised as a list."
+  `(list (map ~@args)))
+
 ;; * macros for functions
 ;; ----------------------------------------------------
 

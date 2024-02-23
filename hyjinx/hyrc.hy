@@ -32,12 +32,12 @@ Copy this somewhere and set HYSTARTUP to its location."
                                        "/multimethod/__init__.py"])
 
 
-;; * hyjinx utilities
+;; * hyjinx repl utilities
 ;; ----------------------------------------------------
 
 (require hyjinx *)
 (import hyjinx [! shell mkdir cd ls edit
-                pp slurp spit re-grep
+                pp slurp spit grepp
                 take chain repeat reduce
                 first second last identity
                 jload jsave

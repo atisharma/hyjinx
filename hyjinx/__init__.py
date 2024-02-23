@@ -36,7 +36,7 @@ except ModuleNotFoundError:
 hy.macros.require('hyjinx.macros', None, assignments = 'ALL', prefix = '')
 
 
-__version__ = "0.28.17"
+__version__ = "0.28.18"
 __version_info__ = __version__.split(".")
 __author__ = "Ati Sharma"
 __license__ = "MIT"

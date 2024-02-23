@@ -5,7 +5,7 @@ A smorgasbord of useful functions.
 (require hyrule [unless -> ->> as->]
          hyjinx.macros *)
 
-(require hyjinx.macros [rest])
+(require hyjinx.macros [rest lmap])
 
 (import functools *
         itertools *
@@ -34,7 +34,7 @@ A smorgasbord of useful functions.
 
 (defn mreload [#* modules]
   "Reload a list of modules in order."
-  (list (map reload modules)))
+  (lmap reload modules))
 
 (defn named-partial [f #* args #** kwargs]
   "Just functools.partial, but with a new function name set."
@@ -87,8 +87,9 @@ A smorgasbord of useful functions.
   "Directory listing."
   (os.listdir path))
 
-(defn re-grep [regex lines * [line-nos False]]
-  "Return items in a string or iterable of strings (lines) that match a regular expression."
+(defn grepp [regex lines * [line-nos False]]
+  "Get Regular Expression in python.
+  Return items in a string or iterable of strings (lines) that match a regular expression."
   (let [rx (re.compile regex)
         ls (if (isinstance lines str)
                (.split lines "\n")
@@ -139,13 +140,20 @@ Usually, you could instead suspend Hy with ctrl-z."
 (defn decimal-align [x lpad]
  "Return string aligned on decimal."
  (if (and x
-          (not (nan? x))
+          (not (math.isnan x))
           (in "." (str x)))
   (.join "." [f"{(int x) : {lpad},.0f}" (second (.split f"{x}" "."))])
   (str x)))
 
 ;; * Numeric
 ;; ----------------------------------------------------
+
+(defn as-float [x]
+  "Cast scalar to float, but use scalar NaN if it fails.
+  Beware of passing lists."
+  (try
+    (float x)
+    (except [] NaN)))
 
 (defn sign [x]
   "+1 for x>=0 (if x is positive semidefinite), -1 for x<0 (negative definite)."
