@@ -12,21 +12,9 @@ A smorgasbord of useful functions.
         cytoolz [first second last drop partition identity]
         hyrule [flatten pformat pp :as hyrule-pp])
 
-(import json
-        math
-        operator
-        os
-        re
-        shutil
-        subprocess
-        sys)
+(import os re)
 
-(import importlib [reload])
 (import pathlib [Path])
-(import datetime [datetime])
-
-(import random [randint])
-(import hashlib [sha1 md5])
 
 
 ;; * Functions
@@ -34,7 +22,7 @@ A smorgasbord of useful functions.
 
 (defn mreload [#* modules]
   "Reload a list of modules in order."
-  (lmap reload modules))
+  (lmap hy.I.importlib.reload modules))
 
 (defn named-partial [f #* args #** kwargs]
   "Just functools.partial, but with a new function name set."
@@ -60,7 +48,7 @@ A smorgasbord of useful functions.
 (defn timestamp [l]
   "Convert list of timestamps to a list of datetime objects."
   (->> l
-    (map (fn [t] (.fromtimestamp datetime t))) 
+    (map (fn [t] (.fromtimestamp hy.I.datetime.datetime t))) 
     (list)))
 
 ;; * OS
@@ -73,11 +61,15 @@ A smorgasbord of useful functions.
 
 (defn ! [#* args]
   "Return the output of running a command in a shell."
-  (. (subprocess.run (.join " " args)
-                     :shell True
-                     :capture-output True
-                     :encoding "utf-8")
+  (. (hy.I.subprocess.run (.join " " args)
+                          :shell True
+                          :capture-output True
+                          :encoding "utf-8")
      stdout))
+
+(defn pwd [path]
+  "Alis to get working directory."
+  (os.getcwd))
 
 (defn cd [path]
   "Change working directory."
@@ -101,17 +93,17 @@ A smorgasbord of useful functions.
 (defn shell [[shell "bash"] #* args]
   "Run an interactive shell as a subprocess.
 Usually, you could instead suspend Hy with ctrl-z."
-  (subprocess.run (.join " " [shell #* args])
-                  :shell False
-                  :stdin sys.stdin
-                  :stdout sys.stdout
-                  :encoding "utf-8"))
+  (hy.I.subprocess.run (.join " " [shell #* args])
+                       :shell False
+                       :stdin hy.I.sys.stdin
+                       :stdout hy.I.sys.stdout
+                       :encoding "utf-8"))
 
 (defn edit [fname]
   "Quick and dirty edit. Use system editor if defined, else vi."
   (let [editor (os.getenv "EDITOR" "vi")]
     (try
-      (subprocess.run [editor fname] :check True))))
+      (hy.I.subprocess.run [editor fname] :check True))))
 
 ;; * Strings
 ;; ----------------------------------------------------
@@ -140,7 +132,7 @@ Usually, you could instead suspend Hy with ctrl-z."
 (defn decimal-align [x lpad]
  "Return string aligned on decimal."
  (if (and x
-          (not (math.isnan x))
+          (not (hy.I.math.isnan x))
           (in "." (str x)))
   (.join "." [f"{(int x) : {lpad},.0f}" (second (.split f"{x}" "."))])
   (str x)))
@@ -157,7 +149,7 @@ Usually, you could instead suspend Hy with ctrl-z."
 
 (defn sign [x]
   "+1 for x>=0 (if x is positive semidefinite), -1 for x<0 (negative definite)."
-  (math.copysign 1 x))
+  (hy.I.math.copysign 1 x))
 
 (defn round-to [x y]
   "Round x to precision y, towards zero."
@@ -177,18 +169,18 @@ Usually, you could instead suspend Hy with ctrl-z."
   
 (defn dice [n]
   "True 1/n of the time."
-  (not (randint 0 (- n 1))))
+  (not (hy.I.random.randint 0 (- n 1))))
 
 (defn prod [l]
   "The product of the elements in l."
-  (reduce operator.mul l))
+  (reduce hy.I.operator.mul l))
 
 ;; * Output
 ;; ----------------------------------------------------
 
 (defn pp [x #* args #** kwargs]
   "Pretty-print with better defaults."
-  (let [term (shutil.get-terminal-size)]
+  (let [term (hy.I.shutil.get-terminal-size)]
     (hyrule-pp x :indent 2 :width (- term.columns 5) #* args #** kwargs)))
 
 (defn hash-color [s]
@@ -197,7 +189,7 @@ Usually, you could instead suspend Hy with ctrl-z."
   (let [S (.upper s)
         i (-> (.upper s)
               (.encode "utf-8")
-              (md5)
+              (hy.I.hashlib.md5)
               (.hexdigest)
               (int 16)
               (% (** 2 24)))]
@@ -232,13 +224,12 @@ Usually, you could instead suspend Hy with ctrl-z."
 
 (defn config [config-file]
   "Get values in a toml file like a hashmap."
-  (import os)
-  (import tomllib) ;; requires python 3.11
+  ;; requires python 3.11
   (unless (os.path.isfile config-file)
     (raise (FileNotFoundError config-file)))
   (-> config-file
       (slurp)
-      (tomllib.loads)))
+      (hy.I.tomllib.loads)))
 
 (defn slurp [fname [mode None] [encoding None] [buffering None]]
   "Read a file and return as a string."
@@ -263,6 +254,21 @@ Usually, you could instead suspend Hy with ctrl-z."
                                     (if (is buffering None) [] [#("buffering" buffering)]))))]
     (o.write content)))
 
+;; * pickling
+;; ----------------------------------------------------
+
+(defn pload [fname]
+  "Read a pickle file. None if it doesn't exist."
+  (let [path (Path fname)]
+    (when (path.exists)
+      (with [f (open fname :mode "rb")]
+        (hy.I.pickle.load obj f))))) 
+
+(defn psave [obj fname * [protocol -1]]
+  "Write an object as a pickle file."
+  (with [f (open fname :mode "wb")]
+    (hy.I.pickle.dump obj f :protocol protocol)))
+
 ;; * JSON
 ;; ----------------------------------------------------
 
@@ -271,8 +277,8 @@ Usually, you could instead suspend Hy with ctrl-z."
   (let [result (re.search "{.*}" text re.DOTALL)]
     (if (and result (result.group))
         (try
-          (json.loads (result.group))
-          (except [err [json.JSONDecodeError]]
+          (hy.I.json.loads (result.group))
+          (except [err [hy.I.json.JSONDecodeError]]
             {}))
       {})))
 
@@ -283,14 +289,14 @@ Usually, you could instead suspend Hy with ctrl-z."
       (with [f (open fname
                      :mode "r"
                      :encoding encoding)]
-        (json.load f)))))
+        (hy.I.json.load f)))))
 
 (defn jsave [obj fname * [encoding "utf-8"]]
   "Write an object as a json file."
   (with [f (open fname
                  :mode "w"
                  :encoding encoding)]
-    (json.dump obj f :indent 4)))
+    (hy.I.json.dump obj f :indent 4)))
 
 (defn jappend [record fname * [encoding "utf-8"]]
  "Append / write a dict to a file as json.
@@ -303,9 +309,9 @@ Usually, you could instead suspend Hy with ctrl-z."
     (with [f (open fname :mode "r+" :encoding encoding)]
       (.seek f 0 os.SEEK_END)
       (.seek f (- (.tell f) 2))
-      (.write f (.format ",\n{}]\n" (json.dumps record :indent 4))))
+      (.write f (.format ",\n{}]\n" (hy.I.json.dumps record :indent 4))))
     (with [f (open fname :mode "w" :encoding encoding)]
-      (.write f (.format "[\n{}]\n" (json.dumps record :indent 4))))))
+      (.write f (.format "[\n{}]\n" (hy.I.json.dumps record :indent 4))))))
 
 ;;; Hashing, id and password functions
 ;;; -----------------------------------------------------------------------------
@@ -313,7 +319,7 @@ Usually, you could instead suspend Hy with ctrl-z."
 (defn hash-id [s]
   "Hex digest of sha1 hash of string."
   (-> (s.encode "utf-8")
-      (sha1)
+      (hy.I.hashlib.sha1)
       (.hexdigest)))
 
 (defn short-id [x]

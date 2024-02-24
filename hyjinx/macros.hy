@@ -103,6 +103,31 @@ macros for various use cases in Hy programming.
   "
   `(defn [property] ~f [self] ~@body))
   
+;; * macros for pytest
+;; ----------------------------------------------------
+
+(defmacro fixture [f #* body]
+  "Function definition using pytest fixture decorator.
+
+  (fixture p 2)
+
+  is equivalent to
+
+  @pytest.fixture
+  def p():
+    2
+  "
+  `(defn [hy.I.pytest.fixture] ~f [] ~@body))
+  
+(defmacro def-numeric-test [test-name f x ans]
+  "Return a function that makes a numeric comparison (using
+  `numpy.isclose`) of function f applied to x to ans, where the result
+  is an ndarray. The result of (f x) should be numerically close to
+  ans for all elements. This is convenient for writing tests with
+  pytest."
+  `(defn ~test-name [~x]
+     (assert (hy.I.numpy.isclose (~f ~x) ~ans)))) 
+
 ;; * macros for data structures
 ;; ----------------------------------------------------
 

@@ -48,7 +48,7 @@ Copy this somewhere and set HYSTARTUP to its location."
 
 (try
   (import numpy)
-  (import hyjinx [ppa])
+  (import hyjinx.mat [ppa])
   (except [ModuleNotFoundError]))
 
 ;; * repl code introspection and discussion
