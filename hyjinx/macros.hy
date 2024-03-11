@@ -154,6 +154,6 @@ macros for various use cases in Hy programming.
   "C-style do-while loop, which executes the body
   while condition is true, but testing at the end."
   `(do
-    ~@body
-    (while ~condition
-      ~@body)))
+     ~@body
+     (while ~condition
+       ~@body)))

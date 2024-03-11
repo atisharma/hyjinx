@@ -35,6 +35,36 @@ Convenience things for ndarrays, matrices and numerical data.
                _ansi.CYAN
                _ansi.MAGENTA])
 
+(defn last-col [m]
+  "Return the last column of m."
+  (ncut : -1))
+  
+(defn drop-first-rows [m n]
+  "Drop the first n rows of m."
+  (cut m n))
+  
+(defn drop-first-cols [m n]
+  "Drop the first n columns of m."
+  (.transpose (cut m.T n)))
+  
+(defn drop-last-cols [m n]
+  "Drop the last n columns of m."
+  (-> m
+      (.transpose)
+      (get Ellipsis (slice 0 (- n)))
+      (.transpose)))
+  
+(defn take-last-rows [m n]
+  "Take the last n rows of m."
+  (cut m (- n)))
+  
+(defn take-last-cols [m n]
+  "Take the last n columns of m."
+  (-> m
+      (.transpose)
+      (cut (- n))
+      (.transpose)))
+
 (defn ppa [#^ ndarray a
            #** kwargs]
   "Pretty-print a numpy ndarray."

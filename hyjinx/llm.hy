@@ -62,7 +62,6 @@ Example usage:
 ; get the llm to explain the llm module
 (llm.explain tabby llm)
 ```
-
 "
 
 (require hyrule [-> ->> unless of])
@@ -350,8 +349,9 @@ Example usage:
   "Load a model.
   TabbyAPI needs to load/unload models before use.
   kwargs are passed to the API.
-  See the TabbyAPI docs for valid keys and values."
-  ;; TODO : steam response to show progress
+  See the TabbyAPI docs for valid keys and values, for example, to load
+  draft models for speculative decoding."
+  ;; TODO : stream response to show progress
   (let [response (client._post "model/load" :admin True :name model #** kwargs)]
     (setv client.model model)
     (print f"{model} loaded.")))
@@ -379,3 +379,15 @@ Example usage:
   "Unload LoRAs when using TabbyAPI."
   (client._post "lora/unload"
                 :admin True))
+
+(defmethod encode [#^ TabbyClient client #^ str text #** kwargs]
+  "Encode a string into tokens.
+  kwargs are passed to the API.
+  See the API docs for options determining handling of special tokens."
+  (client._post "token/encode" :text text #** kwargs))
+
+(defmethod decode [#^ TabbyClient client #^ (of list int) tokens #** kwargs]
+  "Encode a string into tokens.
+  kwargs are passed to the API.
+  See the API docs for options determining handling of special tokens."
+  (client._post "token/decode" :tokens tokens #** kwargs))

@@ -51,6 +51,16 @@ A smorgasbord of useful functions.
     (map (fn [t] (.fromtimestamp hy.I.datetime.datetime t))) 
     (list)))
 
+(defn days-ago [n]
+  (.date (- (datetime.today)
+            (timedelta :days n))))
+
+(defn yesterday []
+  (days-ago 1))
+
+(defn tomorrow []
+  (days-ago -1))
+
 ;; * OS
 ;; ----------------------------------------------------
 
