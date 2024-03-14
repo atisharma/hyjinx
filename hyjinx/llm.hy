@@ -2,13 +2,14 @@
 A Large Language Model in your repl.
 
 APIs and utilities for interacting with a Large Language Model (LLM)
-assistant in Hylang.
+assistant in Hy.
 
 This module provides functions to interact with a Large Language Model
 assistant for various tasks such as generating code comments,
-providing explanations, performing code review, and rewriting code.
-It includes a Hy implementation of a TabbyClient to interact with
-TabbyAPI for model management and streaming completions.
+providing explanations, performing code review, and rewriting code. It
+includes a Hy implementation of a TabbyClient to interact with
+TabbyAPI for model management and streaming completions. It also
+supports various LLM providers such as OpenAI and Anthropic.
 
 Features:
 - converse: Chat over a list of messages, updating the message list in-place.
@@ -65,7 +66,7 @@ Example usage:
 "
 
 (require hyrule [-> ->> unless of])
-(require hyjinx.macros [defmethod])
+(require hyjinx.macros [defmethod rest lmap])
 
 (import hyrule [pformat])
 (import hyjinx.lib [first last hash-color])
@@ -78,16 +79,22 @@ Example usage:
 (import json.decoder [JSONDecodeError])
 (import pansi [ansi :as _ansi])
 
+(try
+  (import anthropic [Anthropic])
+  (except [ModuleNotFoundError]
+    (defclass Anthropic)))
+
 
 (defclass TabbyClientError [Exception])
 (defclass ChatError [Exception])
 
 (setv HasCodeType (| type ModuleType FunctionType MethodType TracebackType))
+(setv ClientType (| OpenAI Anthropic))
 
 ;; * the actually useful functions 
 ;; -----------------------------------------------------------------------------
 
-(defmethod converse [#^ OpenAI client #^ (of list dict) messages #^ str content *
+(defmethod converse [client #^ (of list dict) messages #^ str content *
                      [system-prompt "You are an intelligent and concise assistant."]
                      [color None]
                      #** kwargs]
@@ -124,7 +131,7 @@ Example usage:
               :print print
               #** kwargs)))
 
-(defmethod instruct [#^ OpenAI client #^ str prompt *
+(defmethod instruct [client #^ str prompt *
                      [print True]
                      [margin "  "]
                      [width None]
@@ -137,7 +144,7 @@ Example usage:
         stream (_completion client [sys usr] #** kwargs)]
     (_output stream :print print :width width :margin margin :color color)))
 
-(defmethod instruct [#^ OpenAI client #^ str prompt #^ HasCodeType obj *
+(defmethod instruct [client #^ str prompt #^ HasCodeType obj *
                      [print True]
                      [margin "  "]
                      [width None]
@@ -195,13 +202,7 @@ Example usage:
 (defn _output [stream * [print True] #** kwargs]
   (if print
       (_print-stream stream #** kwargs)
-      (.join "" (lfor chunk stream :if (-> chunk.choices
-                                            (first)
-                                            (getattr "delta")
-                                            (getattr "content"))
-                      (let [choice (first chunk.choices)
-                            content choice.delta.content]
-                        content)))))
+      (.join "" stream)))
 
 (defn _print-stream [stream * [width None] [margin "  "] [color _ansi.reset]]
   "Print a streaming chat completion."
@@ -210,24 +211,19 @@ Example usage:
                     (- term.columns 5))]     
     (setv line "")
     (print margin :end color)
-    (for [chunk stream :if (-> chunk.choices
-                                (first)
-                                (getattr "delta")
-                                (getattr "content"))]
-      (let [choice (first chunk.choices)
-            content choice.delta.content]
-        (+= line content)
-        (cond (.endswith content "\n")
-              (do
-                (print f"{content}{margin}" :end "")
-                (setv line ""))
+    (for [content stream]
+      (+= line content)
+      (cond (.endswith content "\n")
+            (do
+              (print f"{content}{margin}" :end "")
+              (setv line ""))
 
-              (> (+ (len line) (len margin)) w)
-              (do (print f"\n{margin}{(.strip content)}" :end "")
-                  (setv line (.strip content)))
+            (> (+ (len line) (len margin)) w)
+            (do (print f"\n{margin}{(.strip content)}" :end "")
+                (setv line (.strip content)))
 
-              :else
-              (print content :end "" :flush True))))
+            :else
+            (print content :end "" :flush True)))
     (print _ansi.reset)))
 
 ;; * the Tabby API client
@@ -278,16 +274,35 @@ Example usage:
 ;; ----------------------------------------------------
 
 (defmethod _completion [#^ OpenAI client messages * [stream True] [max-tokens 1000] #** kwargs]
-  "Generate a streaming completion using the chat completion endpoint.
-  In python, use as
-        for chunk in stream:
-            print(chunk.choices[0].delta.content or '', end='') "
-  (client.chat.completions.create
-    :model (.pop kwargs "model" (getattr client "model" "gpt-4-turbo-preview"))
-    :messages messages
-    :stream stream
-    :max-tokens max-tokens
-    #** kwargs))
+  "Generate a streaming completion using the chat completion endpoint."
+  (let [stream (client.chat.completions.create
+                 :model (.pop kwargs "model" (getattr client "model" "gpt-4-turbo-preview"))
+                 :messages messages
+                 :stream stream
+                 :max-tokens max-tokens
+                 #** kwargs)]
+    (for [chunk stream :if chunk.choices]
+      (let [text (. (. (first chunk.choices) delta) content)]
+        (when text
+          (yield text))))))
+
+(defmethod _completion [#^ Anthropic client messages * [stream True] [max-tokens 1000] #** kwargs]
+  "Generate a streaming completion using the messages endpoint."
+  (let [system-messages (.join "\n"
+                               (lfor m messages
+                                     :if (= (:role m) "system")
+                                     (:content m)))
+        messages (lfor m messages
+                       :if (not (= (:role m) "system"))
+                       m)]
+    (with [stream (client.messages.stream
+                    :model (.pop kwargs "model" (getattr client "model" "claude-3-opus"))
+                    :system system-messages
+                    :messages messages
+                    :max-tokens max-tokens
+                    #** kwargs)]
+      (for [text stream.text-stream :if text]
+        (yield text)))))
 
 ;; * methods requiring user authentication
 ;; ----------------------------------------------------
@@ -340,9 +355,10 @@ Example usage:
   (client._post "template/unload"
                 :admin True))
 
-(defmethod model-load [#^ OpenAI client #^ str model #** kwargs]
-  "Set the OpenAI model to use for completions.
-  The OpenAI class expects the model to be specified in completions, so this sets a default."
+(defmethod model-load [client #^ str model #** kwargs]
+  "Set the OpenAI or Anthropic model to use for completions.
+  The OpenAI or Anthropic class expects the model to be specified in completions.
+  This just sets a default."
   (setv client.model model))
 
 (defmethod model-load [#^ TabbyClient client #^ str model #** kwargs]
