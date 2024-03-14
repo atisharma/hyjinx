@@ -52,8 +52,8 @@ A smorgasbord of useful functions.
     (list)))
 
 (defn days-ago [n]
-  (.date (- (datetime.today)
-            (timedelta :days n))))
+  (.date (- (hy.I.datetime.datetime.today)
+            (hy.I.datetime.timedelta :days n))))
 
 (defn yesterday []
   (days-ago 1))
