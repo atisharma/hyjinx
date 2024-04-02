@@ -102,6 +102,7 @@ Convenience things for ndarrays, matrices and numerical data.
 (defn _add-corners-1d [#^ ndarray v
                        #** kwargs]
   "Add nice corners to _pformatted ndarray of dimension 1."
+  ;; TODO : consider ⎡ ⎢ ⎣ ⎤ ⎥ ⎦
   (let [padding "  "
         s (_pformat-array v #** kwargs)
         br-width (+ 2 (len s))

@@ -1,4 +1,4 @@
-"A reasonable hyrc.
+"A reasonable hyrc demonstrating usage.
 Copy this somewhere and set HYSTARTUP to its location."
 
 (require hyrule [unless ncut

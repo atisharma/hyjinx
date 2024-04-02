@@ -1,6 +1,8 @@
 "A simple curses display class with context manager.
 You'll need to start the main using (.wrapper curses ...)."
 
+(require hyrule [unless -> ->>])
+
 (import curses)
 (import logging)
 
@@ -79,8 +81,7 @@ You'll need to start the main using (.wrapper curses ...)."
           tw (.newwin curses 1 (- curses.COLS 1) y 1)]
       (.put self y 1 prompt) 
       (.refresh self.window)
-      (.bkgdset tw (or (.color_pair curses 191) curses.A_REVERSE))
-      ;; FIXME : earlier efforts explicitly did (del tb) - check if necessary
+      (.bkgdset tw (| (.color_pair curses 191) curses.A_REVERSE))
       (let [tb (.Textbox curses.textpad tw :insert-mode True)]
         (.edit tb)
         (setv instr (.strip (tb.gather)))

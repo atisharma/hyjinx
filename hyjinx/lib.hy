@@ -12,17 +12,20 @@ A smorgasbord of useful functions.
         cytoolz [first second last drop partition identity]
         hyrule [flatten pformat pp :as hyrule-pp])
 
-(import os re)
+(import os re unicodedata)
 
 (import pathlib [Path])
 
 
-;; * Functions
+;; * Modules
 ;; ----------------------------------------------------
 
 (defn mreload [#* modules]
   "Reload a list of modules in order."
   (lmap hy.I.importlib.reload modules))
+
+;; * Functions
+;; ----------------------------------------------------
 
 (defn named-partial [f #* args #** kwargs]
   "Just functools.partial, but with a new function name set."
@@ -52,13 +55,16 @@ A smorgasbord of useful functions.
     (list)))
 
 (defn days-ago [n]
+  "Return datetime for n days ago."
   (.date (- (hy.I.datetime.datetime.today)
             (hy.I.datetime.timedelta :days n))))
 
 (defn yesterday []
+  "Return datetime for yesterday."
   (days-ago 1))
 
 (defn tomorrow []
+  "Return datetime for tomorrow."
   (days-ago -1))
 
 ;; * OS
@@ -146,6 +152,15 @@ Usually, you could instead suspend Hy with ctrl-z."
           (in "." (str x)))
   (.join "." [f"{(int x) : {lpad},.0f}" (second (.split f"{x}" "."))])
   (str x)))
+
+(defn unicode-search [s]
+  "Search for unicode characters with s in the name."
+  (for [i (range 0x10000)]
+    (let [char (chr i)
+          category (unicodedata.category char)
+          name (unicodedata.name char "")]
+      (when (or (in (.lower s) (.lower name)))
+        (print f"U+{i :04x} {category} {name} {char}")))))
 
 ;; * Numeric
 ;; ----------------------------------------------------
