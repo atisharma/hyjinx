@@ -247,22 +247,24 @@ Example usage:
     (setv self._admin_key (.pop kwargs "admin_key" None))
     (.__init__ (super) #** kwargs))
 
-  (defn _get [self endpoint]
+  (defn _get [self endpoint * [timeout 20]]
     "GET an authenticated endpoint or raise error."
     (let [response (httpx.get (.join self.base-url endpoint)
-                              :headers {"x-api-key" self.api-key})]
+                              :headers {"x-api-key" self.api-key}
+                              :timeout timeout)]
       (if response.is-success
           (response.json)
           (raise (TabbyClientError f"{_ansi.red}{response.status-code}\n{(pformat (:detail (response.json)) :indent 2)}{_ansi.reset}")))))
 
-  (defn _post [self endpoint * [admin False] #** data]
+  (defn _post [self endpoint * [admin False] [timeout 20] #** data]
     "POST to an authenticated endpoint or raise error."
     (let [auth (if admin
                    {"x-admin-key" self._admin-key}
                    {"x-api-key" self.api-key})
           response (httpx.post (.join self.base-url endpoint)
                                :headers auth
-                               :json (or data {}))]
+                               :json (or data {})
+                               :timeout timeout)]
       (if response.is-success
           (try
             (.json response)
@@ -368,7 +370,11 @@ Example usage:
   See the TabbyAPI docs for valid keys and values, for example, to load
   draft models for speculative decoding."
   ;; TODO : stream response to show progress
-  (let [response (client._post "model/load" :admin True :name model #** kwargs)]
+  (let [response (client._post "model/load"
+                               :admin True
+                               :name model
+                               :timeout None
+                               #** kwargs)]
     (setv client.model model)
     (print f"{model} loaded.")))
 
@@ -384,13 +390,14 @@ Example usage:
   loras is a list of dicts, with 'name', 'scaling' as keys."
   (client._post "lora/load"
                 :admin True
-                :loras loras))
+                :loras loras
+                :timeout None))
     
 (defmethod lora-load [#^ TabbyClient client #^ str lora * [scaling 1.0]]
   "Load a single LoRA when using TabbyAPI.
   lora is the name of the lora. Scaling defaults to 1.0."
   (lora-load client [{"name" lora "scaling" scaling}]))
-    
+
 (defmethod lora-unload [#^ TabbyClient client]
   "Unload LoRAs when using TabbyAPI."
   (client._post "lora/unload"
