@@ -28,7 +28,7 @@ Compatible with Hy 0.28.0.
 
 - hyjinx.[zmq_client, zmq_server, crypto, wire]: lazy-pirate zmq RPC architecture. (requires zmq, ecdsa, zstandard)
 
-- hyjinx.llm: discuss code with a Large Language Model (AI). TabbyAPI and OpenAI-compatible are supported. (requires openai)
+- hyjinx.llm: discuss code with a Large Language Model (AI). TabbyAPI, OpenAI-compatible and Claude are supported. (requires `openai` and `anthropic` packages.)
 
 
 ### Install

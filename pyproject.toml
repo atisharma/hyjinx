@@ -36,8 +36,8 @@ dependencies = [
 
 [project.optional-dependencies]
 zmq = ["ecdsa", "pyzmq", "zstandard"]
-llm = ["openai"]
-dev = ["pytest", "ecdsa", "pyzmq", "zstandard", "openai"]
+llm = ["openai", "anthropic"]
+dev = ["pytest", "ecdsa", "pyzmq", "zstandard", "openai", "anthropic"]
 
 [project.urls]
 Repository = "https://github.com/atisharma/hyjinx"
