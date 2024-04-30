@@ -1,5 +1,5 @@
 "
-A Large Language Model in your repl.
+A Large Language Model in your REPL.
 
 APIs and utilities for interacting with a Large Language Model (LLM)
 assistant in Hy.
@@ -163,6 +163,8 @@ Example usage:
         stream (_completion client [sys usr] #** kwargs)]
     (_output stream :print print :width width :margin margin :color color)))
 
+;; TODO use template files like pugsql
+
 (definstruct comments "Rewrite the following code, with high-quality comments.")
 
 (definstruct docstring "Write a high-quality docstring for the following code.")
@@ -278,7 +280,7 @@ Example usage:
 (defmethod _completion [#^ OpenAI client messages * [stream True] [max-tokens 1000] #** kwargs]
   "Generate a streaming completion using the chat completion endpoint."
   (let [stream (client.chat.completions.create
-                 :model (.pop kwargs "model" (getattr client "model" "gpt-4-turbo-preview"))
+                 :model (.pop kwargs "model" (getattr client "model" "gpt-4-turbo"))
                  :messages messages
                  :stream stream
                  :max-tokens max-tokens

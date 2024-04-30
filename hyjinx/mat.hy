@@ -18,7 +18,8 @@ Convenience things for ndarrays, matrices and numerical data.
 ;; this is useful for methods on both array types
 (try
   (import jax.numpy)
-  (setv ndarray (| jax.numpy.ndarray ndarray)))
+  (setv ndarray (| jax.numpy.ndarray ndarray))
+  (except [ModuleNotFoundError]))
 
 
 ;; * Matrices and arrays

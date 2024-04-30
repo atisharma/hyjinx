@@ -12,7 +12,7 @@ hyjinx.mat - numpy pretty-printing for humans.
 (depends on zmq, ecdsa, zstandard)
 hyjinx.[zmq_client, zmq_server, crypto, wire] - lazy-pirate zmq RPC architecture.
 
-(depends on openai)
+(depends on openai and optionally anthropic)
 hyjinx.llm - discuss code with a Large Language Model (AI). TabbyAPI and OpenAI-compatible are supported.
 
 """
@@ -34,5 +34,5 @@ except ModuleNotFoundError:
 hy.macros.require('hyjinx.macros', None, assignments = 'ALL', prefix = '')
 
 # set the package version
-__version__ = "0.28.23"
+__version__ = "0.28.24"
 __version_info__ = __version__.split(".")

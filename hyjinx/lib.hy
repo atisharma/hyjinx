@@ -1,5 +1,21 @@
 "
-A smorgasbord of useful functions.
+A smorgasbord of useful functions to make Hy more expressive.
+
+It includes functions for:
+
+* module reloading
+* function manipulation and composition
+* time and date operations
+* OS interactions
+* string manipulations
+* numeric operations
+* output and formatting
+* list and data structure manipulations
+* file I/O and pickling
+* JSON handling
+* hashing and deterministic uid generation
+
+See individual function docstrings for detailed information.
 "
 
 (require hyrule [unless -> ->> as->]
@@ -108,7 +124,7 @@ A smorgasbord of useful functions.
 
 (defn shell [[shell "bash"] #* args]
   "Run an interactive shell as a subprocess.
-Usually, you could instead suspend Hy with ctrl-z."
+  Usually, you could instead suspend Hy with ctrl-z."
   (hy.I.subprocess.run (.join " " [shell #* args])
                        :shell False
                        :stdin hy.I.sys.stdin
@@ -185,12 +201,16 @@ Usually, you could instead suspend Hy with ctrl-z."
   (>= x 0))
   
 (defn neg? [x]
-  "x is strictly negative (excludes zero)."
+  "x is negative definite (excludes zero)."
   (< x 0))
 
 (defn zero? [x]
   "x is exactly (integer) zero."
   (= x 0))
+
+(defn number? [x]
+  "x has a Number type."
+  (isinstance x hy.I.numbers.Number))
   
 (defn dice [n]
   "True 1/n of the time."
@@ -250,34 +270,31 @@ Usually, you could instead suspend Hy with ctrl-z."
 (defn config [config-file]
   "Get values in a toml file like a hashmap."
   ;; requires python 3.11
-  (unless (os.path.isfile config-file)
-    (raise (FileNotFoundError config-file)))
-  (-> config-file
-      (slurp)
-      (hy.I.tomllib.loads)))
+  (if (os.path.isfile config-file)
+    (-> config-file
+        (slurp)
+        (hy.I.tomllib.loads))
+    (raise (FileNotFoundError config-file))))
 
-(defn slurp [fname [mode None] [encoding None] [buffering None]]
-  "Read a file and return as a string."
-  (setv f open)
-  (when encoding
-    (import codecs)
-    (setv f codecs.open))
-  (with [o (f fname #** (dict (+
-                               (if (is mode None)      [] [#("mode" mode)])
-                               (if (is encoding None)  [] [#("encoding" encoding)])
-                               (if (is buffering None) [] [#("buffering" buffering)]))))]
-    (o.read)))
+(defn slurp [fname #** kwargs]
+  "Read a file and return as a string.
+  kwargs can include mode, encoding and buffering, and will be passed
+  to open()."
+  (let [f (if (:encoding kwargs None)
+              hy.I.codecs.open
+              open)]
+    (with [o (f fname #** kwargs)]
+      (o.read))))
 
-(defn spit [fname content [mode "w"] [encoding None] [buffering None]]
-  "Write content as file fname."
-  (setv f open)
-  (when encoding
-    (import codecs)
-    (setv f codecs.open))
-  (with [o (f fname mode #** (dict (+
-                                    (if (is encoding None)  [] [#("encoding" encoding)])
-                                    (if (is buffering None) [] [#("buffering" buffering)]))))]
-    (o.write content)))
+(defn spit [fname content * [mode "w"] #** kwargs]
+  "Write content as file fname.
+  kwargs can include mode, encoding and buffering, and will be passed
+  to open()."
+  (let [f (if (:encoding kwargs None)
+              hy.I.codecs.open
+              open)]
+    (with [o (f fname mode #** kwargs)]
+      (o.write content))))
 
 ;; * pickling
 ;; ----------------------------------------------------
@@ -287,7 +304,7 @@ Usually, you could instead suspend Hy with ctrl-z."
   (let [path (Path fname)]
     (when (path.exists)
       (with [f (open fname :mode "rb")]
-        (hy.I.pickle.load obj f))))) 
+        (hy.I.pickle.load f))))) 
 
 (defn psave [obj fname * [protocol -1]]
   "Write an object as a pickle file."

@@ -2,12 +2,12 @@
 This module, hyjinx.macros, provides a collection of convenient
 macros for various use cases in Hy programming.
 
-## Macros about Macros
+Macros about Macros
 
 - `delmacro`: Delete or unregister a macro.
 - `help-macro`: Retrieve help or documentation for a macro.
 
-## Macros for sequences
+Macros for sequences
 
 - `rest`: Return a slice of all but the first element in a sequence.
 - `butlast`: Return a slice of all but the last element in a sequence.
@@ -15,16 +15,16 @@ macros for various use cases in Hy programming.
 - `prepend`: Prepend an element to a sequence.
 - `append`: Append an element to a sequence.
 
-## Macros for Functions
+Macros for Functions
 
 - `defmethod`: Dispatch on type using multimethod.multimethod.
 - `defproperty`: Define a class method using the property decorator.
 
-## Macros for Data Structures
+Macros for Data Structures
 
 - `defstruct`: Define a basic immutable dataclass.
 
-## Macros for Flow Control
+Macros for Flow Control
 
 - `do-while`: A C-style do-while loop.
 
