@@ -10,7 +10,8 @@ Picolisp does as:
 > on the elements in the CDR, each on a new line indented by 3 spaces.
 > Finally print a right parenthesis.
 
-Here we use 2 spaces.
+Here we use 2 spaces for indentation (by default).
+And there are a few special cases about when not to break to the next line.
 "
 
 ;; TODO (can be implemented as methods)
@@ -25,8 +26,8 @@ Here we use 2 spaces.
 (import hyjinx [first second last flatten])
 
 (import hy.reader [read_many])
-(import hy.models [Complex FComponent FString Float Integer Keyword String Symbol])
-(import hy.models [Lazy Object Expression Sequence List Set Dict Tuple])
+(import hy.models [Object Complex FComponent FString Float Integer Keyword String Symbol])
+(import hy.models [Lazy Expression Sequence List Set Dict Tuple])
 
 (import multimethod [multimethod])
 
@@ -59,7 +60,7 @@ Here we use 2 spaces.
     (raise (RuntimeError f"Weird object error for form: {form}"))))
 
 (defn _repr [s]
-  "Lose the '."
+  "Lose the quote."
   (rest (hy.repr s)))
 
 ;; * Source code string or Expressions
@@ -70,7 +71,7 @@ Here we use 2 spaces.
   (let [forms (read-many source :skip-shebang True)]
     (grind forms :size size #** kwargs)))
 
-(defmethod grind [#^ (| Lazy (of list Object)) forms #** kwargs]
+(defmethod grind [#^ Lazy forms #** kwargs]
   "A basic Hy pretty-printer."
   (.join "\n\n"
          (lfor form forms
@@ -78,6 +79,7 @@ Here we use 2 spaces.
   
 (defmethod grind [#^ Expression forms * [indent 0] [size SIZE] #** kwargs] 
   "A basic Hy pretty-printer."
+  ;; TODO pairwise forms like setv, cond
   (if (_is-printable forms :size size)
       (_repr forms)
       (let [spaces (* INDENT_STR indent)]
@@ -87,7 +89,7 @@ Here we use 2 spaces.
                        (lfor [ix f] (enumerate forms)
                              ;; keep Keywords with the following form
                              (let [sep (cond (= ix (- (len forms) 1)) ""
-                                             (break-line f) (+ "\n " spaces " ")
+                                             (breaks-line f) (+ "\n " spaces " ")
                                              :else " ")]
                                (+ (grind f :indent (inc indent) :size size)
                                   sep))))
@@ -98,10 +100,17 @@ Here we use 2 spaces.
 
 (defmethod grind [#^ String s * [indent 0] [size SIZE] #** kwargs]
   "A basic Hy pretty-printer."
-  (if (_is-printable s :size size)
+  (let [spaces (* INDENT_STR indent)]
+    (cond
+      ;; short, print as is on the same line
+      (_is-printable s :size size)
       (_repr s)
-      (let [spaces (* INDENT_STR indent)]
-        (+ "\n" spaces (_repr s)))))
+      ;; longer, put on next line
+      (< (len s) 75)
+      (+ "\n" spaces (_repr s))
+      ;; very long, show multiline string
+      :else
+      (+ "\n" spaces "\"" s "\""))))
 
 (defmethod grind [#^ Keyword kw * [indent 0] #** kwargs]
   "A basic Hy pretty-printer."
@@ -172,14 +181,26 @@ Here we use 2 spaces.
 
 ; defn, def_, fn
 
-(defmethod break-line [#^ Object form] True)
+;; The default is to break when too long.
 
-(defmethod break-line [#^ Symbol form]
-  (match (cut (_repr form) 3)
-         "def" False
-         "let" False
-         "for" False
-         ".join" False
-         otherwise True))
+(defmethod breaks-line [#^ Object form] True)
 
-(defmethod break-line [#^ Keyword form] False)
+(defmethod breaks-line [#^ Symbol symbol]
+  "When these symbols are encountered, the next form follows on the same line,
+  unless it's too long."
+  (cond
+    (in (cut (_repr symbol) 3) ["def"])
+    False
+
+    (in (_repr symbol) ["if" "let" "filter" "for" "get" "match" "range" "with" "." "join" "keywords"])
+    False
+
+    :else
+    True))
+
+(defmethod breaks-line [#^ Keyword form] False)
+
+(defmethod breaks-line [#^ Expression forms]
+  "Methods / dotted identifiers have a particular form:
+      ([. None Symbol])."
+  (not (= (_repr (first forms)) ".")))
