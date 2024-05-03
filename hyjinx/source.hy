@@ -4,11 +4,13 @@ Utilities for code inspection and presentation.
 
 (require hyrule [-> ->> unless])
 
+(require hyjinx.macros [defmethod lmap])
+
 (import hyrule [inc dec pformat])
 (import hyjinx [first second last])
-(import hy.compiler [hy-compile])
 (import hy.repl [REPL])
 
+(import multimethod [multimethod])
 (import functools [partial])
 
 (import sys os traceback subprocess shutil)
@@ -18,18 +20,13 @@ Utilities for code inspection and presentation.
 (import pygments.formatters [TerminalFormatter])
 (import pansi [ansi :as _ansi])
 
-(import hyjinx.inspect [currentframe ismodule getmodule getsource getsourcefile stack])
+(import hyjinx.inspect [currentframe stack
+                        ismodule findsource
+                        getmodule getcomments getsource getsourcefile])
+(import hyjinx.beautifier [grind])
 
 (import hyjinx.lib [slurp])
 
-
-(defn get-hy-tree [obj]
-  "Returns the AST of a hy module, function, class etc."
-  (let [file (getsourcefile obj)
-        hy-source (slurp file)
-        module (cond (ismodule obj) obj.__name__
-                     :else obj.__module__)]
-    (hy-compile hy-source module)))
 
 (defn edit-source [obj * [editor None]]
   "Quick and dirty edit of source file.
@@ -67,14 +64,19 @@ Utilities for code inspection and presentation.
         lineno (if (and (hasattr obj "__code__")
                         (hasattr obj.__code__ "co_firstlineno"))
                    (- obj.__code__.co-firstlineno 1)
-                   0)]
+                   (second (findsource obj)))]
       {"line" lineno
        "module" module
        "file" file
        "language" lang
        "extension" ext}))
 
-(defn print-source [obj * [bg "dark"] [linenos False] [details None]]
+(defmethod print-source [#^ multimethod obj #** kwargs]
+  "Pretty-print the source code of a multimethod, with syntax highlighting."
+  (for [f (obj.values)]
+    (print-source f #** kwargs)))
+
+(defmethod print-source [obj * [bg "dark"] [linenos False] [details None]]
   "Pretty-print the source code of module or function obj, with syntax highlighting. bg is dark or light."
   (let [details (get-source-details obj)
         padding (if linenos "      " "")
@@ -88,7 +90,9 @@ Utilities for code inspection and presentation.
     (print)
     (print header)
     (unless linenos (print))
-    (print (highlight (getsource obj) lexer formatter))))
+    (print (highlight
+             (.join "" [(or (getcomments obj) "") (grind (getsource obj))])
+             lexer formatter))))
 
 (defn interact []
   "Interact with code from called point by starting a nested REPL
