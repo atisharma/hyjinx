@@ -70,7 +70,8 @@ Example usage:
 
 (import hyrule [pformat])
 (import hyjinx.lib [first last hash-color])
-(import hyjinx.source [get-source get-source-details])
+(import hyjinx.inspect [getsource])
+(import hyjinx.source [get-source-details])
 
 (import httpx shutil)
 (import types [ModuleType FunctionType MethodType TracebackType])
