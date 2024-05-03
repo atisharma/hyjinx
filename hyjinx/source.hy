@@ -18,7 +18,7 @@ Utilities for code inspection and presentation.
 (import pygments.formatters [TerminalFormatter])
 (import pansi [ansi :as _ansi])
 
-(import inspect [currentframe ismodule getmodule getsource getsourcefile stack])
+(import hyjinx.inspect [currentframe ismodule getmodule getsource getsourcefile stack])
 
 (import hyjinx.lib [slurp])
 
@@ -40,12 +40,13 @@ Utilities for code inspection and presentation.
       - the system editor set by $EDITOR
       - vi +{line}
   It will replace any mention of '{line}' in the editor string with
-  the line number associated with `obj`.
-"
+  the line number associated with `obj`."
+  ;; TODO : arguments to emacsclient are not handled
   (let [line (:line (get-source-details obj))
-        editor (os.getenv "HYJINX_EDITOR" (os.getenv "EDITOR" f"vi +{line}"))]
+        editor (os.getenv "HYJINX_EDITOR" (os.getenv "EDITOR" f"vi +{line}"))
+        editor_args (os.getenv "HYJINX_EDITOR_ARGS" "")]
     (try
-      (subprocess.run [(.replace editor "{line}" (str line)) (getsourcefile obj)] :check True))))
+      (subprocess.run [(.replace editor "{line}" (str line)) #* editor_args (getsourcefile obj)] :check True))))
 
 (defn _get-lang-from-filename [filename]
   "Guess the language from the filename extension."
@@ -73,40 +74,6 @@ Utilities for code inspection and presentation.
        "language" lang
        "extension" ext}))
 
-(defn _get-lines [filename line-number]
-  (let [source (slurp filename)
-        lines (.split source "\n")
-        rest-lines (cut lines line-number None)
-        defn-lines []
-        paren-excess 0]
-    (for [l rest-lines]
-      (.append defn-lines l)
-      (+= paren-excess (l.count "("))
-      (-= paren-excess (l.count ")"))
-      (unless (or paren-excess
-                  (not (.count l ")")))
-              (break)))
-    (.join "\n" defn-lines)))  
-           
-(defn get-hy-source [obj]
-  "Returns the source code of a hy module or the module of a hy function, class etc."
-  (let [details (get-source-details obj)
-        file (:file details)
-        module (:module details)
-        lineno (:line details)]
-    ;; TODO : handle classes
-    (if lineno
-        (_get-lines file lineno)
-        (slurp file))))
-
-(defn get-source [obj]
-  "Get the source for a python or hy function, module or other object."
-  (let [details (get-source-details obj)
-        lang (:language details)]
-    (cond (= lang "python") (getsource obj)
-          (= lang "hylang") (get-hy-source obj)
-          :else (raise (NotImplementedError f"Filetype {(:extension details)} is unknown.")))))
-
 (defn print-source [obj * [bg "dark"] [linenos False] [details None]]
   "Pretty-print the source code of module or function obj, with syntax highlighting. bg is dark or light."
   (let [details (get-source-details obj)
@@ -121,7 +88,7 @@ Utilities for code inspection and presentation.
     (print)
     (print header)
     (unless linenos (print))
-    (print (highlight (get-source obj) lexer formatter))))
+    (print (highlight (getsource obj) lexer formatter))))
 
 (defn interact []
   "Interact with code from called point by starting a nested REPL
