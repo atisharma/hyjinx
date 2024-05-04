@@ -37,5 +37,5 @@ except ModuleNotFoundError:
 hy.macros.require('hyjinx.macros', None, assignments = 'ALL', prefix = '')
 
 # set the package version
-__version__ = "0.28.24"
+__version__ = "0.28.25"
 __version_info__ = __version__.split(".")
