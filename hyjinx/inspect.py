@@ -4,9 +4,10 @@ Get useful information from live Hy or Python objects.
 This module provides Hy compatibility with Cpython's inspect module.
 
 The `findsource` and `getsourcelines` functions involve applying the
- Hy reader and compiling Hy code, which executes any code defined in
- reader macros, so consider this fact before using them. Other
- functions are imported from CPython's `inspect` module.
+Hy reader and compiling Hy code, which executes any code defined in
+reader macros, so consider this fact before using them. Other
+functions are imported from CPython's `inspect` module. See below for
+descriptions as they relate to Python.
 
 The module encapsulates the interface provided by the internal special
 attributes (co_*, im_*, tb_*, etc.) in a friendlier fashion.
@@ -166,7 +167,7 @@ def getcomments(object):
                 # Look for comments above the object and work up.
                 indent = inspect.indentsize(lines[lnum])
                 end = lnum - 1
-                while end >= 0 and lines[end].lstrip().startswith(';') and True:
+                while end >= 0 and lines[end].lstrip().startswith(';'):
                     comments = [lines[end].expandtabs().lstrip()] + comments
                     end -= 1
                 return ''.join(comments)

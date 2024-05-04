@@ -49,6 +49,9 @@ version = {attr = "hyjinx.__version__"}
 [tool.setuptools.package-data]
 "*" = ["*.hy"]
 
+[project.scripts]
+hy-beautify = "hyjinx.beautify:cli_grind_files"
+
 # ... other project metadata fields as listed in:
 #     https://packaging.python.org/en/latest/guides/writing-pyproject-toml/
 

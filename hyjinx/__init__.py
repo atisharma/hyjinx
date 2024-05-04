@@ -19,6 +19,9 @@ hyjinx.llm - discuss code with a Large Language Model (AI). TabbyAPI and OpenAI-
 
 import hy
 
+from hyjinx import inspect
+from hyjinx import beautifier
+
 from hyjinx.lib import *
 from hyjinx.source import *
 from hyjinx.docs import *

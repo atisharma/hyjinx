@@ -13,18 +13,27 @@ And there are a few special cases about when not to break to the next line.
 
 ;; TODO : abstract out form pairing or listing from grind(Expression)
 
-;; TODO : \n(defn
-
-;; TODO : (defmain for cli use
-
 ;; TODO : preserve comments
 
-(require hyrule [-> ->> unless of])
+(require hyrule [-> ->> unless of defmain])
 (require hyjinx.macros [defmethod rest])
 
-(import itertools [batched])
+(try
+  (import itertools [batched])
+  ;; batched was introduced in python 3.12
+  (except [ImportError]
+    (import itertools [islice])
+    (defn batched [iterable n]
+      "batched('ABCDEFG', 3) → ABC DEF G))"
+      (when (< n 1)
+        (raise (ValueError "n must be at least one")))
+      (setv it (iter iterable))
+      (while (setx batch (tuple (islice it n)))
+        (yield batch)))))
+
+
 (import hyrule [inc dec])
-(import hyjinx [first second last flatten])
+(import hyjinx.lib [first second last flatten slurp])
 
 (import hy.reader [read_many])
 (import hy.models [Object Complex FComponent FString Float Integer Keyword String Symbol])
@@ -33,9 +42,9 @@ And there are a few special cases about when not to break to the next line.
 (import multimethod [multimethod])
 
 
-(setv SIZE 12)
-(setv STR_SIZE 75)
-(setv INDENT_STR "  ")
+(setv SIZE 12
+      STR_SIZE 75
+      INDENT_STR "  ")
 
 (setv Atom (| Complex FComponent FString Float Integer Keyword String Symbol))
   
@@ -97,7 +106,7 @@ And there are a few special cases about when not to break to the next line.
     :else
     (rest (hy.repr forms))))
 
-;; * Special cases, whether to break a line afterwards
+;; * Special cases
 ;; -----------------------------------
 
 (defmethod _is-def [#^ Object form]
@@ -124,7 +133,7 @@ And there are a few special cases about when not to break to the next line.
   "When some symbols are encountered (e.g. `cond`), the next forms go in pairs."
   ;; There's no point pairing setv, since the reader expands
   ;; a compound setv statement into individual ones anyway.
-  (in (_repr symbol) ["cond" "setv" "setx"]))
+  (in symbol ['cond 'setv 'setx]))
 
 (defmethod _takes-paired-list [#^ Object object #** kwargs]
   "When some symbols are encountered, the next form is a paired `List`."
@@ -142,27 +151,29 @@ And there are a few special cases about when not to break to the next line.
   "When these symbols are encountered, the next form follows on the same line,
   unless it's too long."
   (cond
+    ;; It's a heuristic, but a reasonable one.
     (in (cut (_repr symbol) 3) ["def"])
     False
 
-    (in (_repr symbol)
-        ["import" "except"
-         "if" "when" "unless"
-         "filter" "map" "accumulate" "reduce" "of"
-         "setv" "setx" "let"
-         "for" "get" "match" "range" "while"
-         "with" "." "join" "keywords"])
+    (in symbol
+        ['import 'except
+         'if 'when 'unless
+         'filter 'map 'accumulate 'reduce 'of
+         'setv 'setx 'let
+         'for 'get 'match 'case 'branch 'range 'while
+         'with '. 'join 'keywords])
     False
 
     :else
     True))
 
-(defmethod _breaks-line [#^ Keyword form] False)
+(defmethod _breaks-line [#^ Keyword form]
+  False)
 
 (defmethod _breaks-line [#^ Expression forms]
   "Methods / dotted identifiers have a particular form:
       ([. None Symbol])."
-  (not (= (_repr (first forms)) ".")))
+  (not (= (first forms) '.)))
 
 ;; * The layout engine
 ;; -----------------------------------
@@ -433,3 +444,20 @@ And there are a few special cases about when not to break to the next line.
          (_layout expr :indent-str (+ "  " indent-str) :size size :pair False)
          "}")))
       
+;; * The cli entrypoints
+;; -----------------------------------
+
+(defn grind-file [fname]
+  "Pretty-print a hy file."
+  (-> fname
+      (slurp)
+      (grind)
+      (print)))
+
+(defn cli-grind-files []
+  "Pretty-print hy files from the shell."
+  ;; first arg is script name
+  (import sys)
+  (for [fname (rest sys.argv) :if (.endswith fname ".hy")]
+    (grind-file fname)
+    (print)))

@@ -7,7 +7,7 @@ Utilities for code inspection and presentation.
 (require hyjinx.macros [defmethod lmap])
 
 (import hyrule [inc dec pformat])
-(import hyjinx [first second last])
+(import hyjinx.lib [first second last])
 (import hy.repl [REPL])
 
 (import multimethod [multimethod])
@@ -23,7 +23,7 @@ Utilities for code inspection and presentation.
 (import hyjinx.inspect [currentframe stack
                         ismodule findsource
                         getmodule getcomments getsource getsourcefile])
-(import hyjinx.beautifier [grind])
+(import hyjinx.beautify [grind])
 
 (import hyjinx.lib [slurp])
 
