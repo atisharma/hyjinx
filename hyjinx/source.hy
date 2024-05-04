@@ -80,19 +80,22 @@ Utilities for code inspection and presentation.
   "Pretty-print the source code of module or function obj, with syntax highlighting. bg is dark or light."
   (let [details (get-source-details obj)
         padding (if linenos "      " "")
+        language (:language details)
         header f"{padding}{obj}, module {(:module details)}\n{padding}File {_ansi.b}{(:file details)}{_ansi._b}, line {(:line details)}"
-        lexer (get-lexer-by-name (:language details))
+        lexer (get-lexer-by-name language)
         formatter (TerminalFormatter :linenos linenos
                                      :bg bg
-                                     :stripall True)]
+                                     :stripall True)
+        source (if (= language "hylang")
+                 (.join "" [(or (getcomments obj) "")
+                            (grind (getsource obj))])
+                 (getsource obj))]
     ;; modify formatter so that line numbers correspond to the source
     (setv formatter._lineno (:line details))
     (print)
     (print header)
     (unless linenos (print))
-    (print (highlight
-             (.join "" [(or (getcomments obj) "") (grind (getsource obj))])
-             lexer formatter))))
+    (print (highlight source lexer formatter))))
 
 (defn interact []
   "Interact with code from called point by starting a nested REPL

@@ -54,7 +54,7 @@ Copy this somewhere and set HYSTARTUP to its location."
 ;; * repl code introspection and discussion
 ;; ----------------------------------------------------
 
-(import hyjinx [edit-source get-source print-source interact])
+(import hyjinx [edit-source print-source interact])
 
 (try
   (import hyjinx [llm])

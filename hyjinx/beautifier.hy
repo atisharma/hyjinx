@@ -4,7 +4,6 @@ A Hy source code pretty-printer.
 Should be absorbed into hyjinx.source.
 
 Picolisp does as:
-
 > If an expression is atomic or has a size less or equal to 12, then print it.
 > Otherwise, print a left parenthesis, recurse on the CAR, then recurse
 > on the elements in the CDR, each on a new line indented by 3 spaces.
@@ -14,9 +13,10 @@ Here we use 2 spaces for indentation (by default).
 And there are a few special cases about when not to break to the next line.
 "
 
-;; TODO (can be implemented as methods)
+;; TODO : pairwise things
 ;; * pair off expressions in lists in a let form, (let [a b \n c d] ...)
-;; * pair off expressions in dicts {a b  c d}  
+;; * pairwise forms for setv
+;; * pairwise forms for cond
 
 (require hyrule [-> ->> unless of])
 (require hyjinx.macros [defmethod rest])
@@ -33,35 +33,44 @@ And there are a few special cases about when not to break to the next line.
 
 
 (setv SIZE 10)
+(setv STR_SIZE 75)
 (setv INDENT_STR "  ")
 
 (setv Atom (| Complex FComponent FString Float Integer String Symbol))
   
 
-;; * Utility functions
-;; -----------------------------------
+;; * Tests whether a form is ready to render
+;; -----------------------------------------
 
-(defn _is-printable [form * size]
-  "An expression is a hy Atom or has a flattened length less or equal to `size`."
-  (cond
-    (isinstance form (| Expression Sequence))
-    (<= (len (flatten form)) size)
+(defmethod _is-printable [#^ (| Expression Sequence) form * [size SIZE] [str-size STR_SIZE]]
+    (<= (len (flatten form)) size))
 
-    (isinstance form String)
-    (<= (len form) size)
+(defmethod _is-printable [#^ String form * [size SIZE] [str-size STR_SIZE]]
+    (<= (len form) str-size))
 
-    (isinstance form Atom)
-    True
-    
-    (isinstance form Object) 
-    True
+(defmethod _is-printable [#^ Atom form * [size SIZE] [str-size STR_SIZE]]
+    True)
 
-    :else
-    (raise (RuntimeError f"Weird object error for form: {form}"))))
+(defmethod _is-printable [#^ Object form * [size SIZE] [str-size STR_SIZE]]
+    True)
 
-(defn _repr [s]
+;; * Render forms to text
+;; -----------------------------------------
+
+(defmethod _repr [#^ Object f]
   "Lose the quote."
-  (rest (hy.repr s)))
+  (rest (hy.repr f)))
+
+(defmethod _repr [#^ Keyword f]
+  "Keep the :."
+  (hy.repr f))
+
+(defmethod _repr [#^ Expression forms]
+  "Lose the quote."
+  (if (and (= (len forms) 3)
+           (= (first forms) 'annotate))
+    f"#^ {(_repr (last forms))} {(_repr (second forms))} "
+    (rest (hy.repr forms))))
 
 ;; * Source code string or Expressions
 ;; -----------------------------------
@@ -73,27 +82,29 @@ And there are a few special cases about when not to break to the next line.
 
 (defmethod grind [#^ Lazy forms #** kwargs]
   "A basic Hy pretty-printer."
-  (.join "\n\n"
+  (.join "\n\n\n"
          (lfor form forms
                (grind form #** kwargs))))
   
 (defmethod grind [#^ Expression forms * [indent 0] [size SIZE] #** kwargs] 
   "A basic Hy pretty-printer."
-  ;; TODO pairwise forms like setv, cond
-  (if (_is-printable forms :size size)
-      (_repr forms)
-      (let [spaces (* INDENT_STR indent)]
-        (.join ""
-               ["\n" spaces "("
-                (.join ""
-                       (lfor [ix f] (enumerate forms)
-                             ;; keep Keywords with the following form
-                             (let [sep (cond (= ix (- (len forms) 1)) ""
-                                             (breaks-line f) (+ "\n " spaces " ")
-                                             :else " ")]
-                               (+ (grind f :indent (inc indent) :size size)
-                                  sep))))
-                ")"]))))
+  (cond
+    (_is-printable forms :size size)
+    (_repr forms)
+
+    :else
+    (let [spaces (* INDENT_STR indent)]
+      (.join ""
+             ["("
+              (.join ""
+                     (lfor [ix f] (enumerate forms)
+                           ;; Keep Keywords and so on with the following form.
+                           (let [sep (cond (= ix (- (len forms) 1)) ""
+                                           (breaks-line f) (+ "\n " spaces " ")
+                                           :else " ")]
+                             (+ (grind f :indent (inc indent) :size size)
+                                sep))))
+              ")"]))))
 
 ;; * Atoms, Strings
 ;; -----------------------------------
@@ -105,16 +116,13 @@ And there are a few special cases about when not to break to the next line.
       ;; short, print as is on the same line
       (_is-printable s :size size)
       (_repr s)
-      ;; longer, put on next line
-      (< (len s) 75)
-      (+ "\n" spaces (_repr s))
       ;; very long, show multiline string
       :else
-      (+ "\n" spaces "\"" s "\""))))
+      (+ "\"" s "\""))))
 
 (defmethod grind [#^ Keyword kw * [indent 0] #** kwargs]
   "A basic Hy pretty-printer."
-  (hy.repr kw))
+  (_repr kw))
 
 (defmethod grind [#^ Atom atom #** kwargs]
   "A basic Hy pretty-printer."
@@ -130,7 +138,7 @@ And there are a few special cases about when not to break to the next line.
       (let [spaces (* INDENT_STR indent)
             kv-sep " "]
         (.join ""
-               ["\n" spaces "{"
+               ["{"
                 (.join (+ "\n " spaces)
                        (lfor [k v] (batched expr 2)
                              (+ (grind k :indent (inc indent) :size size)
@@ -141,10 +149,15 @@ And there are a few special cases about when not to break to the next line.
 (defmethod grind [#^ List forms * [indent 0] [size SIZE] #** kwargs] 
   "A basic Hy pretty-printer."
   (if (_is-printable forms :size size)
-      (_repr forms)
+      (.join ""
+             ["["
+              (.join " "
+                     (lfor f forms
+                           (grind f :indent (inc indent) :size size)))
+              "]"])
       (let [spaces (* INDENT_STR indent)]
         (.join ""
-               ["\n" spaces "["
+               ["["
                 (.join (+ "\n " spaces)
                        (lfor f forms
                              (grind f :indent (inc indent) :size size)))
@@ -156,7 +169,7 @@ And there are a few special cases about when not to break to the next line.
       (_repr expr)
       (let [spaces (* INDENT_STR indent)]
         (.join ""
-               ["\n" spaces "#("
+               ["#("
                 (.join "\n"
                        (lfor f forms
                              (+ spaces
@@ -169,7 +182,7 @@ And there are a few special cases about when not to break to the next line.
       (_repr expr)
       (let [spaces (* INDENT_STR indent)]
         (.join ""
-               ["\n" spaces "#{"
+               ["#{"
                 (.join "\n"
                        (lfor f forms
                              (+ spaces
@@ -179,11 +192,9 @@ And there are a few special cases about when not to break to the next line.
 ;; * Special cases, whether to break a line afterwards
 ;; -----------------------------------
 
-; defn, def_, fn
-
-;; The default is to break when too long.
-
-(defmethod breaks-line [#^ Object form] True)
+(defmethod breaks-line [#^ Object form]
+  "The default is to break the expression when it's too long."
+  True)
 
 (defmethod breaks-line [#^ Symbol symbol]
   "When these symbols are encountered, the next form follows on the same line,
@@ -192,7 +203,12 @@ And there are a few special cases about when not to break to the next line.
     (in (cut (_repr symbol) 3) ["def"])
     False
 
-    (in (_repr symbol) ["if" "let" "filter" "for" "get" "match" "range" "with" "." "join" "keywords"])
+    (in (_repr symbol)
+        ["import"
+         "if" "when" "unless"
+         "filter" "of"
+         "for" "get" "match" "range"
+         "with" "." "join" "keywords"])
     False
 
     :else
