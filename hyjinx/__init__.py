@@ -20,7 +20,6 @@ hyjinx.llm - discuss code with a Large Language Model (AI). TabbyAPI and OpenAI-
 import hy
 
 from hyjinx import inspect
-from hyjinx import beautifier
 
 from hyjinx.lib import *
 from hyjinx.source import *
@@ -37,5 +36,5 @@ except ModuleNotFoundError:
 hy.macros.require('hyjinx.macros', None, assignments = 'ALL', prefix = '')
 
 # set the package version
-__version__ = "0.28.25"
+__version__ = "0.28.26"
 __version_info__ = __version__.split(".")

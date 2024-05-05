@@ -141,7 +141,7 @@ And there are a few special cases about when not to break to the next line.
 
 (defmethod _takes-paired-list [#^ Symbol symbol #** kwargs]
   "When some symbols are encountered, the next form is a paired `List`."
-  (in (_repr symbol) ["for" "let" "with"]))
+  (in (_repr symbol) ["for" "let" "loop" "with"]))
 
 (defmethod _breaks-line [#^ Object form]
   "The default is to break the expression when it's too long."
