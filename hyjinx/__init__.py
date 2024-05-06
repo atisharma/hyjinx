@@ -36,5 +36,30 @@ except ModuleNotFoundError:
 hy.macros.require('hyjinx.macros', None, assignments = 'ALL', prefix = '')
 
 # set the package version
-__version__ = "0.28.26"
+__version__ = "0.28.27"
 __version_info__ = __version__.split(".")
+
+
+def __cli_grind_files():
+  """Pretty-print hy files from the shell."""
+  # The first arg is script name, ignore it.
+  import sys
+  import hyjinx.beautify
+  for fname in sys.argv[1:]:
+    if fname.endswith(".hy"):
+        hyjinx.beautify.grind_file(fname)
+        print()
+
+def __cli_hylight_files():
+  """Syntax highlight hy files from the shell."""
+  # The first arg is script name, ignore it.
+  import sys
+  import hyjinx.source
+  for fname in sys.argv[1:]:
+    if fname.endswith(".hy"):
+        lexer = hyjinx.source.get_lexer_by_name("hylang")
+        formatter = hyjinx.source.TerminalFormatter(linenos=False, bg="light", stripall=True)
+        code = slurp(fname)
+        print()
+        print(highlight(code, lexer, formatter))
+        print()

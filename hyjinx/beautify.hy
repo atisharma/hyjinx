@@ -1,19 +1,24 @@
 "
 A Hy source code pretty-printer.
 
-Picolisp does as:
+The basic algorithm is as Picolisp does:
 > If an expression is atomic or has a size less or equal to 12, then print it.
 > Otherwise, print a left parenthesis, recurse on the CAR, then recurse
 > on the elements in the CDR, each on a new line indented by 3 spaces.
 > Finally print a right parenthesis.
 
 Here we use 2 spaces for indentation (by default).
-And there are a few special cases about when not to break to the next line.
+There are a special cases about when not to break to the next line,
+to handle paired `cond`, `let` assignments, etc.
+
+Comments are discarded by the reader, so are lost.
+The Hy Expressions (forms) keep information about their original
+position (`f.start-column`, `f.start-line` etc.) so it is possible,
+in principle, to reconstruct them. 
 "
 
-;; TODO : abstract out form pairing or listing from grind(Expression)
-
 ;; TODO : preserve comments
+;; TODO : abstract out form pairing or listing from grind(Expression)
 
 (require hyrule [-> ->> unless of defmain])
 (require hyjinx.macros [defmethod rest])
@@ -35,16 +40,16 @@ And there are a few special cases about when not to break to the next line.
 (import hyrule [inc dec])
 (import hyjinx.lib [first second last flatten slurp])
 
-(import hy.reader [read_many])
 (import hy.models [Object Complex FComponent FString Float Integer Keyword String Symbol])
 (import hy.models [Lazy Expression Sequence List Set Dict Tuple])
 
 (import multimethod [multimethod])
 
 
-(setv SIZE 12
-      STR_SIZE 75
-      INDENT_STR "  ")
+(setv SIZE 12          ; The size of expressions above which they are broken up.
+      STR_SIZE 75      ; The size of string at which it's rendered as a multi-line
+                       ; (rendering \n as newlines)
+      INDENT_STR "  ") ; The indentation used to signify levels (two spaces).
 
 (setv Atom (| Complex FComponent FString Float Integer Keyword String Symbol))
   
@@ -231,19 +236,25 @@ And there are a few special cases about when not to break to the next line.
 ;; * Source code string or Expressions
 ;; -----------------------------------
 
-(defmethod grind [#^ str source * [size SIZE] #** kwargs]
+(defmethod grind [#^ str source * [size SIZE] [filename "<string>"] #** kwargs]
   "A basic Hy pretty-printer.
 
   This method is for a source-code string.
-  This is probably what you want to use."
-  (let [forms (read-many source :skip-shebang True)]
+  This is probably what you want to use.
+
+  The provided filename is set as an attribute
+  but is not currently used."
+  (let [forms (read-many source :filename filename :skip-shebang True)]
     (grind forms :size size #** kwargs)))
 
 (defmethod grind [#^ Lazy forms #** kwargs]
   "This method is for a lazy sequence of Hy forms."
   (.join "\n\n"
          (lfor form forms
-               (grind form #** kwargs))))
+               (do
+                 (when (hasattr forms "filename")
+                   (setv form.filename forms.filename))
+                 (grind form #** kwargs)))))
   
 (defmethod grind [#^ Expression forms * [indent-str ""] [size SIZE] #** kwargs] 
   "This method applies to Hy `Expression` objects
@@ -276,6 +287,8 @@ And there are a few special cases about when not to break to the next line.
                    (let [sep (cond (= ix (- (len forms) 4)) ""
                                    (_breaks-line f) (+ "\n " indent-str " ")
                                    :else " ")]
+                     (when (hasattr forms "filename")
+                       (setv f.filename forms.filename))
                      (+ (grind f :indent-str (_indent indent-str) :size size)
                         sep))))
       ")")
@@ -298,6 +311,8 @@ And there are a few special cases about when not to break to the next line.
                    (let [sep (cond (= ix (- (len forms) 4)) ""
                                    (_breaks-line f) (+ "\n " indent-str " ")
                                    :else " ")]
+                     (when (hasattr forms "filename")
+                       (setv f.filename forms.filename))
                      (+ (grind f :indent-str (_indent indent-str) :size size)
                         sep))))
       ")")
@@ -318,6 +333,8 @@ And there are a few special cases about when not to break to the next line.
                       (let [sep (cond (is f (last forms)) ""
                                       (_breaks-line f) (+ "\n " indent-str " ")
                                       :else " ")]
+                        (when (hasattr forms "filename")
+                          (setv f.filename forms.filename))
                         (+ (grind f :indent-str (_indent indent-str) :size size) sep))))
          ")"))
 
@@ -348,6 +365,8 @@ And there are a few special cases about when not to break to the next line.
                    (let [sep (cond (= ix (- (len forms) 1)) ""
                                    (_breaks-line f) (+ "\n " indent-str " ")
                                    :else " ")]
+                     (when (hasattr forms "filename")
+                       (setv f.filename forms.filename))
                      (+ (grind f :indent-str (_indent indent-str) :size size)
                         sep))))
       ")")))
@@ -444,20 +463,12 @@ And there are a few special cases about when not to break to the next line.
          (_layout expr :indent-str (+ "  " indent-str) :size size :pair False)
          "}")))
       
-;; * The cli entrypoints
+;; * The entrypoints
 ;; -----------------------------------
 
 (defn grind-file [fname]
   "Pretty-print a hy file."
   (-> fname
       (slurp)
-      (grind)
+      (grind :filename fname)
       (print)))
-
-(defn cli-grind-files []
-  "Pretty-print hy files from the shell."
-  ;; first arg is script name
-  (import sys)
-  (for [fname (rest sys.argv) :if (.endswith fname ".hy")]
-    (grind-file fname)
-    (print)))

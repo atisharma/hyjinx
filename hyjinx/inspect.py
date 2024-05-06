@@ -2,6 +2,8 @@
 Get useful information from live Hy or Python objects.
 
 This module provides Hy compatibility with Cpython's inspect module.
+Its functionality has been extended to cover functools' `partial`
+objects and `multimethod`s.
 
 The `findsource` and `getsourcelines` functions involve applying the
 Hy reader and compiling Hy code, which executes any code defined in
@@ -45,10 +47,12 @@ import inspect
 
 from inspect import *
 from itertools import chain
+from functools import partial
 
 from hy import repr
 from hy.reader import read_many
 from hy.compiler import hy_compile
+from hy.models import Expression, Lazy
 
 from multimethod import multimethod
 
@@ -56,8 +60,21 @@ from multimethod import multimethod
 def ismultimethod(object):
     return isinstance(object, multimethod)
     
+def ispartial(object):
+    return isinstance(object, partial)
+    
+def isExpression(object):
+    return isinstance(object, Expression)
+    
+def isLazy(object):
+    return isinstance(object, Lazy)
+    
 def getfile(object):
     """Work out which source or compiled file an object was defined in."""
+    if isLazy(object) and hasattr(object, 'filename'):
+        return object.filename
+    if isExpression(object) and hasattr(object, 'filename'):
+        return object.filename
     if ismultimethod(object) and hasattr(object, '__module__'):
         module = sys.modules.get(object.__module__)
         if getattr(module, '__file__', None):
@@ -66,6 +83,19 @@ def getfile(object):
             raise OSError('source code not available')
         else:
             raise TypeError('{!r} is an unhandled multimethod'.format(object))
+    elif ispartial(object) and hasattr(object, '__module__'):
+        module = sys.modules.get(object.__module__)
+        if getattr(module, '__file__', None):
+            return module.__file__
+        elif object.__module__ == '__main__':
+            raise OSError('source code not available')
+        else:
+            raise TypeError('{!r} is an unhandled partial'.format(object))
+    elif isExpression(object):
+        if hasattr(object, 'filename'):
+            return object.filename
+        else:
+            raise OSError('source code not available')
     else:
         return inspect.getfile(object)
 
@@ -101,7 +131,15 @@ def findsource(object):
     is raised if the source code cannot be retrieved."""
     file = getsourcefile(object)
     # Identify Hy objects from file extension
-    if getfile(object).endswith('.hy') and not inspect.isframe(object):
+    if ispartial(object):
+        # A partial has a func atrribute and carries its args and
+        # keywords with it.
+        return findsource(object.func)
+    elif isExpression(object) or isLazy(object):
+        lnum = object.start_line
+        lines = linecache.getlines(file)
+        return (lines, lnum)
+    elif getfile(object).endswith('.hy') and not inspect.isframe(object):
         module = getmodule(object, file)
         # list of source code lines
         lines = linecache.getlines(file, module.__dict__) if module else linecache.getlines(file)
@@ -117,7 +155,7 @@ def findsource(object):
         elif isclass(object):
             qualname = object.__qualname__
             source = ''.join(lines)
-            hst = read_many(source, file, skip_shebang=True)
+            hst = read_many(source, filename=file, skip_shebang=True)
             pst = hy_compile(hst, module, filename=file, source=source)
             class_finder = inspect._ClassFinder(qualname)
             try:
@@ -148,7 +186,7 @@ def getcomments(object):
         try:
             [lines, lnum] = findsource(object)
             comments = []
-            if inspect.ismodule(object):
+            if inspect.ismodule(object) or isExpression(object) or isLazy(object):
                 # Remove shebang.
                 start = 1 if lines and lines[0][:2] == '#!' else 0
                 # Remove preceding empty lines and textless comments.
@@ -162,6 +200,8 @@ def getcomments(object):
                     return ''.join(comments)
                 else:
                     return None
+            elif ispartial(object):
+                return getcomments(object.func)
             # Look for a comment block preceding the object
             elif lnum > 0:
                 # Look for comments above the object and work up.
@@ -195,6 +235,8 @@ def getsourcelines(object):
 
     if inspect.istraceback(object):
         object = object.tb_frame
+    elif ispartial(object):
+        object = object.func
 
     # For module or frame that corresponds to module, return all source lines.
     if (inspect.ismodule(object) or (inspect.isframe(object) and object.f_code.co_name == "<module>")):
@@ -204,7 +246,7 @@ def getsourcelines(object):
     # assumes python tokenization. So deal with this as a special case.
     elif getfile(object).endswith('.hy'):
         # Read the first form that was found using inspect.findsource.
-        form = next(read_many(''.join(lines[lnum:]), skip_shebang=True))
+        form = next(read_many(''.join(lines[lnum:]), filename=getfile(object), skip_shebang=True))
         # Pretty-print it so it looks like the source, dropping the '
         source = repr(form)[1:]
         return source, lnum

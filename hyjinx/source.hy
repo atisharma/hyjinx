@@ -76,6 +76,18 @@ Utilities for code inspection and presentation.
   (for [f (obj.values)]
     (print-source f #** kwargs)))
 
+(defmethod print-source [#^ partial obj * [linenos False] #** kwargs]
+  "Pretty-print the source code of a partial, with syntax highlighting."
+  (let [padding (if linenos "      " "")]
+    (print)
+    (print f"{padding}{obj}")
+    (print)
+    (print "Resolves to:")
+    (print-source obj.func #** kwargs)
+    (print f"args: {obj.args}")
+    (print f"keyword args: {obj.keywords}")
+    (print)))
+
 (defmethod print-source [obj * [bg "dark"] [linenos False] [details None]]
   "Pretty-print the source code of module or function obj, with syntax highlighting. bg is dark or light."
   (let [details (get-source-details obj)
@@ -87,9 +99,8 @@ Utilities for code inspection and presentation.
                                      :bg bg
                                      :stripall True)
         source (if (= language "hylang")
-                 (.join "" [(or (getcomments obj) "")
-                            (grind (getsource obj))])
-                 (getsource obj))]
+                   (grind (getsource obj) :filename (:file details))
+                   (getsource obj))]
     ;; modify formatter so that line numbers correspond to the source
     (setv formatter._lineno (:line details))
     (print)
