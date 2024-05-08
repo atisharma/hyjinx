@@ -43,6 +43,7 @@ in principle, to reconstruct them.
 
 (import hy.models [Object Complex FComponent FString Float Integer Keyword String Symbol])
 (import hy.models [Lazy Expression Sequence List Set Dict Tuple])
+(import hy.reader [read-many])
 
 (setv SIZE 12)         ; The size of expressions above which they are broken up.
 (setv STR_SIZE 75)     ; The size of string at which it's rendered as a multi-line
@@ -65,6 +66,7 @@ in principle, to reconstruct them.
         form-lines (cut source-lines (- form.start-line 1) form.end-line)
         post-comment (.strip (.join "" (rest (.partition (last form-lines) ";"))))
         lnum (- form.start-line 2)
+        indent (* " " form.start-column)
         pre-comments []]
     (while (and (>= lnum 0)
                 (or
@@ -80,7 +82,7 @@ in principle, to reconstruct them.
                            (.join ""
                                   (lfor c (reversed pre-comments)
                                         :if c
-                                        (+ c "\n"))))
+                                        (+ indent c "\n"))))
                         "")}))
 
 
