@@ -17,7 +17,6 @@ position (`f.start-column`, `f.start-line` etc.) so it is possible,
 in principle, to reconstruct them. 
 "
 
-;; TODO : preserve comments
 ;; TODO : abstract out form pairing or listing from grind(Expression)
 
 (require hyrule [-> ->> unless of defmain])
@@ -37,22 +36,53 @@ in principle, to reconstruct them.
         (yield batch)))))
 
 
+(import multimethod [multimethod])
+
 (import hyrule [inc dec])
 (import hyjinx.lib [first second last flatten slurp])
 
 (import hy.models [Object Complex FComponent FString Float Integer Keyword String Symbol])
 (import hy.models [Lazy Expression Sequence List Set Dict Tuple])
 
-(import multimethod [multimethod])
-
-
-(setv SIZE 12          ; The size of expressions above which they are broken up.
-      STR_SIZE 75      ; The size of string at which it's rendered as a multi-line
+(setv SIZE 12)         ; The size of expressions above which they are broken up.
+(setv STR_SIZE 75)     ; The size of string at which it's rendered as a multi-line
                        ; (rendering \n as newlines)
-      INDENT_STR "  ") ; The indentation used to signify levels (two spaces).
+(setv INDENT_STR "  ") ; The indentation used to signify levels (two spaces).
 
 (setv Atom (| Complex FComponent FString Float Integer Keyword String Symbol))
   
+
+;; * Process comments out-of-band
+;; -----------------------------------------
+
+(defn extract-comments [form source]
+  "Comments are started by a ; and terminated by newlines.
+  Use the form's start and end position information to look before and
+  after the form for comments."
+  ;; FIXME : this could be fooled by `; ....` in the middle of a multi-line
+  ;; string preceding a form.
+  (let [source-lines (.split source "\n")
+        form-lines (cut source-lines (- form.start-line 1) form.end-line)
+        post-comment (.strip (.join "" (rest (.partition (last form-lines) ";"))))
+        lnum (- form.start-line 2)
+        pre-comments []]
+    (while (and (>= lnum 0)
+                (or
+                  (.startswith (.strip (get source-lines lnum) ) ";")
+                  (= (.strip (get source-lines lnum) ) "")))
+      (pre-comments.append (.strip (get source-lines lnum)))
+      (-= lnum 1))
+    {"post_comment" (if post-comment
+                        (+ " " post-comment "\n")
+                        "")
+     "pre_comments" (if pre-comments
+                        (+ "\n"
+                           (.join ""
+                                  (lfor c (reversed pre-comments)
+                                        :if c
+                                        (+ c "\n"))))
+                        "")}))
+
 
 ;; * Tests whether a form is ready to render
 ;; -----------------------------------------
@@ -236,25 +266,22 @@ in principle, to reconstruct them.
 ;; * Source code string or Expressions
 ;; -----------------------------------
 
-(defmethod grind [#^ str source * [size SIZE] [filename "<string>"] #** kwargs]
+(defmethod grind [#^ str source * [size SIZE] #** kwargs]
   "A basic Hy pretty-printer.
 
   This method is for a source-code string.
-  This is probably what you want to use.
+  This is probably what you want to use."
+  (let [forms (read-many source :skip-shebang True)]
+    (grind forms :size size :source source #** kwargs)))
 
-  The provided filename is set as an attribute
-  but is not currently used."
-  (let [forms (read-many source :filename filename :skip-shebang True)]
-    (grind forms :size size #** kwargs)))
-
-(defmethod grind [#^ Lazy forms #** kwargs]
+(defmethod grind [#^ Lazy forms * source #** kwargs]
   "This method is for a lazy sequence of Hy forms."
-  (.join "\n\n"
-         (lfor form forms
-               (do
-                 (when (hasattr forms "filename")
-                   (setv form.filename forms.filename))
-                 (grind form #** kwargs)))))
+  (.join "\n"
+         (lfor expression forms
+               (let [comments (extract-comments expression source)]
+                 (+ (:pre-comments comments)
+                    (grind expression #** kwargs)
+                    (:post-comment comments))))))
   
 (defmethod grind [#^ Expression forms * [indent-str ""] [size SIZE] #** kwargs] 
   "This method applies to Hy `Expression` objects
@@ -287,8 +314,6 @@ in principle, to reconstruct them.
                    (let [sep (cond (= ix (- (len forms) 4)) ""
                                    (_breaks-line f) (+ "\n " indent-str " ")
                                    :else " ")]
-                     (when (hasattr forms "filename")
-                       (setv f.filename forms.filename))
                      (+ (grind f :indent-str (_indent indent-str) :size size)
                         sep))))
       ")")
@@ -311,8 +336,6 @@ in principle, to reconstruct them.
                    (let [sep (cond (= ix (- (len forms) 4)) ""
                                    (_breaks-line f) (+ "\n " indent-str " ")
                                    :else " ")]
-                     (when (hasattr forms "filename")
-                       (setv f.filename forms.filename))
                      (+ (grind f :indent-str (_indent indent-str) :size size)
                         sep))))
       ")")
@@ -333,8 +356,6 @@ in principle, to reconstruct them.
                       (let [sep (cond (is f (last forms)) ""
                                       (_breaks-line f) (+ "\n " indent-str " ")
                                       :else " ")]
-                        (when (hasattr forms "filename")
-                          (setv f.filename forms.filename))
                         (+ (grind f :indent-str (_indent indent-str) :size size) sep))))
          ")"))
 
@@ -365,8 +386,6 @@ in principle, to reconstruct them.
                    (let [sep (cond (= ix (- (len forms) 1)) ""
                                    (_breaks-line f) (+ "\n " indent-str " ")
                                    :else " ")]
-                     (when (hasattr forms "filename")
-                       (setv f.filename forms.filename))
                      (+ (grind f :indent-str (_indent indent-str) :size size)
                         sep))))
       ")")))
@@ -406,47 +425,8 @@ in principle, to reconstruct them.
       (_repr expr)
       (+ "["
          (_layout expr :indent-str (+ " " indent-str) :size size :pair pair)
-         "]"))
+         "]")))
 
-  #_(let [items (cond
-                  ;; short and paired (for `let` and `with`)
-                  (and pair (_is-printable forms :size size))
-                  (.join (+ "\n " indent-str)
-                         (lfor [a b] (batched forms 2)
-                               (+ (grind a :indent-str (_indent indent-str) :size size)
-                                  " "
-                                  (grind b :indent-str (_indent indent-str) :size size))))
-                  ;; long, paired, and the first of each pair is short enough
-                  (and pair (all (map (fn [f] (_is-printable f :size 3))
-                                      (cut forms 0 None 2))))
-                  (let [instr
-                        (* " " (max (map (fn [f] (len (_repr f))) 
-                                         (cut forms 0 None 2))))]
-                    (.join (+ "\n " indent-str)
-                           (lfor [a b] (batched forms 2)
-                                 (+ (grind a :indent-str (_indent indent-str) :size size)
-                                    (cut instr (len (_repr a)) None) " "
-                                    (grind b :indent-str (+ instr (_indent indent-str)) :size size)))))
-                  ;; long and paired
-                  pair
-                  (.join (+ "\n " indent-str)
-                         (lfor [a b] (batched forms 2)
-                               (+ (grind a :indent-str (_indent indent-str) :size size)
-                                  "\n" "__" (_indent indent-str)
-                                  (grind b :indent-str (+ "__" (_indent indent-str)) :size size))))
-                  ;; short and not paired
-                  (_is-printable forms :size size)
-                  (.join " "
-                         (lfor f forms
-                               (grind f :indent-str (_indent indent-str) :size size)))
-                  ;; long and not paired
-                  :else
-                  (.join (+ "\n " indent-str)
-                         (lfor f forms
-                             (grind f :indent-str (_indent indent-str) :size size))))]
-        
-      (+ "[" items "]")))
-    
 (defmethod grind [#^ Tuple expr * [indent-str ""] [size SIZE] #** kwargs] 
   "This is the implementation for `Tuple`."
   (if (_is-printable expr :size size)
@@ -470,5 +450,5 @@ in principle, to reconstruct them.
   "Pretty-print a hy file."
   (-> fname
       (slurp)
-      (grind :filename fname)
+      (grind)
       (print)))

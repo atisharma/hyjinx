@@ -16,6 +16,8 @@
 
 (import hyjinx.lib [mkdir slurp])
 
+;; TODO search docs for terms
+
 
 (defn _install_docs [tarball-url package * [extension ".rst"]]
   "Download a local copy of some specific documentation."

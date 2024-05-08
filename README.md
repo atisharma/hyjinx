@@ -7,20 +7,22 @@ Compatible with Hy 0.28.0.
 
 ### Hylights
 
-- REPL syntax highlighting (put `(import hyjinx.source [hylight]) (setv repl-output-fn hylight)` in your .hyrc)
-- pretty tracebacks with correct syntax highlighting for hy or python
-- print/get/edit source code of a function, module etc.
-- in-repl code analysis and discussion using LLMs
-- `defmethod` (if `multimethod` is installed)
-- numpy array pretty printing
-- a zmq lazy pirate protocol
-- a minimal ncurses class
+- A Hy code beautifier and in-REPL syntax highlighting
+- An `inspect` module that works like Python's, but also for Hy code
+- Pretty tracebacks with correct syntax highlighting for hy or python
+- Print/get/edit source code of a function, module etc.
+- In-repl code analysis and discussion using LLMs (e.g. for writing docstrings)
+- A sensible `defmethod`
+- Numpy array pretty printing
+- A zmq lazy pirate protocol
+- A minimal ncurses class
 
 
 ### Modules
 
 - hyjinx.lib: a smorgasbord of convenience functions.
-- hyjinx.source: code inspection.
+- hyjinx.source: live code inspection.
+- hyjinx.inspect: code inspection.
 - hyjinx.doc: peruse hy documentation.
 - hyjinx.screen: a convenient ncurses wrapper.
 
@@ -47,6 +49,12 @@ To install offline hy/hyrule documentation,
 ```bash
 $ hy -m hyjinx.docs
 ```
+
+For syntax highlighting in the REPL, put 
+```hylang
+(import hyjinx.source [hylight]) (setv repl-output-fn hylight)
+```
+in your .hyrc.
 
 See hyjinx.hyrc for example usage.
 

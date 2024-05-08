@@ -88,8 +88,9 @@ Utilities for code inspection and presentation.
     (print f"keyword args: {obj.keywords}")
     (print)))
 
-(defmethod print-source [obj * [bg "dark"] [linenos False] [details None]]
-  "Pretty-print the source code of module or function obj, with syntax highlighting. bg is dark or light."
+(defmethod print-source [obj * [bg "light"] [linenos False] [details None]]
+  "Pretty-print the source code of module or function obj, with syntax highlighting.
+  Keyword `bg` is \"dark\" or \"light\"."
   (let [details (get-source-details obj)
         padding (if linenos "      " "")
         language (:language details)
@@ -137,8 +138,11 @@ File {_ansi.b}{filename}{_ansi._b}, line {lineno}{_ansi.reset}")
         (setv sys.ps1 old-ps1
               sys.ps2 old-ps2)))))
     
-(defn hylight [s * [bg "dark"] [language "hylang"]]
-  "Syntax highlight a Hy (or other language) string. This is nice for use in the repl - put
+(defn hylight [s * [bg "light"] [language "hylang"]]
+  "Syntax highlight a Hy (or other language) string.
+  Keyword `bg` is \"dark\" or \"light\".
+
+  This is nice for use in the repl - put
   (import hyjinx.source [hylight])
   (setv repl-output-fn hylight)
   in your .hyrc."
