@@ -39,7 +39,7 @@ Starts the socket on import.
 (setv frontend (start-router-socket (:listen _conf)))
 
 
-(defn/a send [zmsg]
+(defn :async send [zmsg]
   "Send a reply to a client."
   (try
     (await (.send-multipart frontend zmsg))
@@ -54,7 +54,7 @@ Starts the socket on import.
         expected-hash (hash-id (+ client-time (json.dumps payload)))]
     (crypto.verify pub-key signature expected-hash)))
 
-(defn/a server-loop [f [id 0]]
+(defn :async server-loop [f [id 0]]
   "Wait for a message, then call (f msg).
 For example, f may verify signature, then call a method, then send the reply (verified rpc)."
   (while True
