@@ -72,6 +72,10 @@ Example usage:
 (import hyjinx.lib [first last hash-color])
 (import hyjinx.inspect [getsource])
 (import hyjinx.source [get-source-details])
+(import pygments)
+(import pygments [highlight])
+(import pygments.lexers [get-lexer-by-name guess-lexer])
+(import pygments.formatters [TerminalFormatter])
 
 (import httpx shutil)
 (import types [ModuleType FunctionType MethodType TracebackType])
@@ -202,31 +206,66 @@ Example usage:
 ;; * output handling
 ;; -----------------------------------------------------------------------------
 
+(defn _is-code-fence [s]
+  "Check if the end of line starts or ends a code block.
+  Uses either three backticks, four spaces or a tab after a newline."
+  (or (= s "```")
+      (= s "    ")
+      (= s "\t")))
+
 (defn _output [stream * [print True] #** kwargs]
   (if print
       (_print-stream stream #** kwargs)
       (.join "" stream)))
 
-(defn _print-stream [stream * [width None] [margin "  "] [color _ansi.reset]]
+(defn _print-stream [stream * [width None] [margin "  "] [bg "dark"] [color _ansi.reset]]
   "Print a streaming chat completion."
-  (let [term (shutil.get-terminal-size)
+  (let [formatter (TerminalFormatter :bg bg :stripall True)
+        term (shutil.get-terminal-size)
         w (if width (min width (- term.columns 5))
                     (- term.columns 5))]     
     (setv line "")
+    (setv in-code-block False)
+
     (print margin :end color)
+
     (for [content stream]
       (+= line content)
-      (cond (.endswith content "\n")
-            (do
-              (print f"{content}{margin}" :end "")
-              (setv line ""))
 
-            (> (+ (len line) (len margin)) w)
-            (do (print f"\n{margin}{(.strip content)}" :end "")
-                (setv line (.strip content)))
+      (if (or (_is-code-fence content) (_is-code-fence (cut line -3 None)))
+        (do
+          (print content :end "\r\033[K")
+          (setv in-code-block (not in-code-block))
+          ;; opening fence ignored
+          ;; closing fence flushes output
+          (unless in-code-block
+            (let [lines (.split line "\n")
+                  lang (cut (first lines) 3 None)
+                  code (.join "\n" (cut lines 1 -1))
+                  lexer (if lang
+                          (try
+                            (get-lexer-by-name lang)
+                            (except [pygments.util.ClassNotFound]
+                              (guess-lexer code)))
+                          (guess-lexer code))]
+              (print "\r")
+              (print (.strip (highlight code lexer formatter)))
+              (print color :end ""))
+            (setv line "")))
 
-            :else
-            (print content :end "" :flush True)))
+        (unless in-code-block
+          (cond (.endswith content "\n")
+                (do
+                  (print f"{content}{margin}" :end "")
+                  (setv line ""))
+
+                (> (+ (len line) (len margin)) w)
+                (do (print f"\n{margin}{(.strip content)}" :end "")
+                    (setv line (.strip content)))
+
+                :else
+                (print content :end "" :flush True)))))
+
     (print _ansi.reset)))
 
 ;; * the Tabby API client

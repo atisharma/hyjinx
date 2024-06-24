@@ -2,7 +2,7 @@
 
 *Functions and macros useful for modern living in the [Hy](http://hylang.org) REPL.*
 
-Compatible with Hy 0.28.0.
+Compatible with Hy 0.29.0.
 
 
 ### Hylights

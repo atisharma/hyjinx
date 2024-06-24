@@ -16,7 +16,7 @@ Utilities for code inspection and presentation.
 (import sys os traceback subprocess shutil)
 
 (import pygments [highlight])
-(import pygments.lexers [get-lexer-by-name HyLexer PythonLexer PythonTracebackLexer])
+(import pygments.lexers [get-lexer-by-name HyLexer PythonLexer PythonTracebackLexer guess-lexer])
 (import pygments.formatters [TerminalFormatter])
 (import pansi [ansi :as _ansi])
 
