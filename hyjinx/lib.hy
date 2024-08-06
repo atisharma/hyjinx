@@ -238,7 +238,7 @@ See individual function docstrings for detailed information.
               (.hexdigest)
               (int 16)
               (% (** 2 24)))]
-    (get ansi.rgb (.replace f"{i :#x}" "0x" "#"))))
+    (get ansi.rgb (.replace f"{i :#08x}" "0x" "#"))))
 
 ;; * Manipulations on lists and other basic data structures
 ;; ----------------------------------------------------
