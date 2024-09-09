@@ -124,7 +124,7 @@ See individual function docstrings for detailed information.
 
 (defn shell [[shell "bash"] #* args]
   "Run an interactive shell as a subprocess.
-  Usually, you could instead suspend Hy with ctrl-z."
+  Usually, you would instead suspend Hy with ctrl-z."
   (hy.I.subprocess.run (.join " " [shell #* args])
                        :shell False
                        :stdin hy.I.sys.stdin
