@@ -65,6 +65,8 @@ Example usage:
 ```
 "
 
+(import re)
+
 (require hyrule [-> ->> unless of])
 (require hyjinx.macros [defmethod rest lmap])
 
@@ -80,9 +82,13 @@ Example usage:
 (import httpx shutil)
 (import types [ModuleType FunctionType MethodType TracebackType])
 (import itertools [tee])
-(import openai [OpenAI])
 (import json.decoder [JSONDecodeError])
 (import pansi [ansi :as _ansi])
+
+(try
+  (import openai [OpenAI])
+  (except [ModuleNotFoundError]
+    (defclass OpenAI)))
 
 (try
   (import anthropic [Anthropic])
@@ -95,11 +101,12 @@ Example usage:
 
 (setv HasCodeType (| type ModuleType FunctionType MethodType TracebackType))
 (setv ClientType (| OpenAI Anthropic))
+(setv ContentType (| str (of list dict)))
 
 ;; * the actually useful functions 
 ;; -----------------------------------------------------------------------------
 
-(defmethod converse [client #^ (of list dict) messages #^ str content *
+(defmethod converse [client #^ (of list dict) messages #^ ContentType content *
                      [system-prompt "You are an intelligent and concise assistant."]
                      [color None]
                      #** kwargs]
@@ -109,7 +116,9 @@ Example usage:
   You might use this function like:
   (setv _messages [])
   (setv chat (partial converse tabby _messages))
-  (chat \"Hello there.\")"
+  (chat \"Hello there.\")
+  
+  The supplied content can be a string or a list of dicts with text and a base64 encoded image."
   (let [sys (_system system-prompt)
         usr (_user content)
         width (.pop kwargs "width" None)
@@ -159,7 +168,7 @@ Example usage:
   "Instruct a hy or python object's source code."
   (let [details (get-source-details obj)
         language (:language details)
-        source (get-source obj)
+        source (getsource obj)
         sys (_system system-prompt)
         usr (_user f"You will be shown code for {obj} (module {(:module details)}). It is in the {language} language.
 {prompt}
@@ -187,52 +196,137 @@ Example usage:
 ;; * message convenience functions
 ;; -----------------------------------------------------------------------------
 
-(defn _msg [#^ str role #^ str content]
-  "Just a simple dict with the needed fields."
+(defn oai-img-content [#^ str text #^ str image-path]
+  "Create a message for OpenAI-compatible API with text and image content."
+  (if (or text image)
+    [
+     {"type" "text" "text" text}
+     {"type" "image_url"
+      "image_url" {"url" (+ "data:image/png;base64," (b64-encode-image image-path))}}]
+    (raise (ChatError f"No content in message (role: {role})."))))
+
+(defn anthropic-img-content [#^ str text #^ str image-path]
+  "Create a message for Anthropic API with text and image content."
+  ;; TODO: guess image type
+  ;; TODO: consolidate anthropic and OAI image APIs
+  (if (or text image)
+    [{"type" "text" "text" text}
+     {"type" "base64"
+      "media_type" "image/png"
+      "data" (b64-encode-image image-path)}]
+    (raise (ChatError f"No content in message (role: {role})."))))
+
+  
+(defn _msg [#^ str role #^ ContentType content]
+  "Just a simple dict with the needed fields.
+  The supplied content can be a string or a list of dicts with text and a base64 encoded image."
   (if content
       {"role" role
-       "content" (.strip content)}
+       "content" content}
       (raise (ChatError f"No content in message (role: {role})."))))
 
-(defn _system [#^ str content]
+(defn _system [#^ ContentType content]
   (_msg "system" content))
 
-(defn _user [#^ str content]
+(defn _user [#^ ContentType content]
   (_msg "user" content))
 
-(defn _assistant [#^ str content]
+(defn _assistant [#^ ContentType content]
   (_msg "assistant" content))
 
 ;; * output handling
 ;; -----------------------------------------------------------------------------
 
-(defn _is-code-fence [s]
-  "Check if the end of line starts or ends a code block.
-  Uses either three backticks, four spaces or a tab after a newline."
-  (or (= s "```")
-      (= s "    ")
-      (= s "\t")))
+(defn _start-code-fence [s]
+  "Check if the stream chunk starts a code block.
+  Uses either three backticks or three tildes after a newline, with optional language specifier."
+  (re.search r"(```|~~~)\s*([\w]+)?[\r\n]+(.*)" s)) ; Claude doesn't split chunks at end of line
+  ;(re.search r"(```|~~~)\s*([\w]*)\n$" s))
+  
+(defn _end-code-fence [s]
+  "Check if the stream chunk ends a code block.
+  Uses either three backticks or three tildes after a newline."
+  (re.search r"[\n\r\f](```|~~~)[\n\r\f]+(.*)" s))  ; Claude doesn't split chunks at end of line
+  ;(re.search r"[\n\r\f](```|~~~)[\n\r\f]" s))  ; Claude doesn't split chunks at end of line
 
 (defn _output [stream * [print True] #** kwargs]
   (if print
       (_print-stream stream #** kwargs)
       (.join "" stream)))
 
+(defn _fprint [s]
+  (print s :flush True :end ""))
+
 (defn _print-stream [stream * [width None] [margin "  "] [bg "dark"] [color _ansi.reset]]
-  "Print a streaming chat completion."
+  "Print a streaming chat completion.
+  Applies syntax highlighting to the string inside a code fence.
+  Any syntax-highlighted strings are printed as streamed."
+  (let [term (shutil.get-terminal-size)
+        w (if width (min width (- term.columns 5))
+                    (- term.columns 5))]     
+    (setv text "\n")
+
+    ;(print margin :end color)
+    (_fprint color)
+
+    (for [content stream]
+      (+= text content) ; accumulate content into text
+      (let [match (_start-code-fence text)] ; check on each streamed token
+        (if match
+          (do
+            (print (cut content (- (len (match.group 3))))) ; the bit before the opening fence, add newline lost in regex
+            (setv text "")
+            ;; what isn't already printed goes to the other function
+            (let [trailing (_print-code-block stream
+                                              :bg bg 
+                                              :fence (match.group 1) 
+                                              :lang (match.group 2) 
+                                              :code (match.group 3))]
+              (_fprint (+ color trailing color))))
+          (_fprint content))))
+
+    (print _ansi.reset)))
+
+(defn _print-code-block [stream * [fence "```"] [lang ""] [code ""] [bg "dark"]]
+  "Applies syntax highlighting to a streaming chat completion,
+  accumulating strings then breaking and printing when exiting the code fence."
+  (setv text "") ; after the closing fence
+  (for [content stream]
+    (+= code content) ; accumulate code lines for highlighting
+    (let [match (_end-code-fence code)]
+      (when match ; check each streamed token, print when done
+        (let [l (len (match.group 0))]
+          ;; remove trailing non-code stuff and save it for later
+          ;; take care cutting when (len code) is 0.
+          (setv text (cut code (- (len code) l) None))
+          (setv code (cut code (- (len code) l)))
+          (break)))))
+  (let [formatter (TerminalFormatter :bg bg :stripall True)
+        ;lines (.split code "\n")
+        lexer (if lang
+                (try
+                  (get-lexer-by-name lang)
+                  (except [pygments.util.ClassNotFound]
+                    (guess-lexer code)))
+                (guess-lexer code))]
+    ;(print f"{_ansi.i}{_ansi.b}{_ansi.green}{fence}{lang}{_ansi.reset}")
+    ;(_fprint _ansi.reset)
+    (_fprint (highlight code lexer formatter))
+    text)) ; return any trailing text
+    ;(print f"{_ansi.i}{_ansi.b}{_ansi.green}{fence}\n{_ansi.reset}" :end ""))); closing fence
+
+(defn _XXX_REMOVE_IMPLEMENTS_WRAPPING_print-stream [stream * [width None] [margin "  "] [bg "dark"] [color _ansi.reset]]
+  "Print a streaming chat completion code block with syntax highlighting."
   (let [formatter (TerminalFormatter :bg bg :stripall True)
         term (shutil.get-terminal-size)
         w (if width (min width (- term.columns 5))
                     (- term.columns 5))]     
     (setv line "")
-    (setv in-code-block False)
-
-    (print margin :end color)
 
     (for [content stream]
-      (+= line content)
+      (+= line content) ; accumulate lines
 
-      (if (or (_is-code-fence content) (_is-code-fence (cut line -3 None)))
+      (if (_is-code-fence content) 
         (do
           (print content :end "\r\033[K")
           (setv in-code-block (not in-code-block))
@@ -270,6 +364,7 @@ Example usage:
 
 ;; * the Tabby API client
 ;; ----------------------------------------------------
+
 
 (defclass TabbyClient [OpenAI]
   "A REPL-facing client for TabbyAPI (https://github.com/theroyallab/tabbyAPI).
@@ -456,3 +551,10 @@ Example usage:
   kwargs are passed to the API.
   See the API docs for options determining handling of special tokens."
   (client._post "token/decode" :tokens tokens #** kwargs))
+
+(defn b64-encode-image [#^ str fname]
+  "Encode a png image to a base 64 string."
+  (with [im (open fname "rb")]
+    (-> (im.read)
+        (.decode "utf-8")
+        (base64.b64encode))))

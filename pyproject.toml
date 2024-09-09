@@ -12,7 +12,7 @@ authors = [
 ]
 dynamic = ["version", "readme"]
 requires-python = ">=3.11"
-keywords = ["hy", "hylang", "utilities", "zeromq", "llm", "openai"]
+keywords = ["hy", "hylang", "utilities", "zeromq", "llm", "openai", "anthropic"]
 license = {file = "LICENSE"}
 classifiers = [
     "License :: OSI Approved :: MIT License",
