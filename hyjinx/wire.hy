@@ -12,7 +12,7 @@
 
 (setv sender-id (. (uuid1) hex))
 
-(setv HYJINX_PROTOCOL_VERSION "0.0.2")
+(setv HYJINX_PROTOCOL_VERSION "0.0.3")
 
 (setv keys (crypto.keys (config "passphrase"))
       priv-key (:private keys)
@@ -40,7 +40,7 @@
         (decompress)
         (json.loads)) 
     (except [json.JSONDecodeError]
-      (zerror "Failed to decode message JSON."))))
+      (zerror :code "JSON" :message "Failed to decode message JSON."))))
 
-(defn zerror [text]
-  {"error" text})
+(defn zerror [message]
+  {"error" {"code" code "message" message}})

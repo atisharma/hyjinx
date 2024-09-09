@@ -30,13 +30,13 @@ Starts the socket on import.
 
 (setv socket (start-socket))
 
-(defn rpc [method #* args #** kwargs]
+(defn rpc [payload]
   "Call a method on the server. Return None for timeout."
   (try
-    (.send socket (wrap {"method" method "args" args "kwargs" kwargs}))
+    (.send socket (wrap payload))
     (:payload (unwrap (.recv socket)))
     (except [zmq.Again]
-      (zerror "The request timed out."))))
+      (zerror "TIMEOUT" "The request timed out."))))
 
 ;; example call
 (defn motd [#* args #** kwargs]
