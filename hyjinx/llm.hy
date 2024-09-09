@@ -122,7 +122,6 @@ Example usage:
   (let [sys (_system system-prompt)
         usr (_user content)
         width (.pop kwargs "width" None)
-        margin (.pop kwargs "margin" "    ")
         [output-1 output-2] (tee (_completion
                                    client
                                    [sys #* messages usr]
@@ -130,7 +129,6 @@ Example usage:
     (_output output-1
              :print True
              :width width
-             :margin margin
              :color (or color (hash-color (or client.model ""))))
     (.append messages usr)
     (.append messages (_assistant (_output output-2 :print False)))))
@@ -147,7 +145,6 @@ Example usage:
 
 (defmethod instruct [client #^ str prompt *
                      [print True]
-                     [margin "  "]
                      [width None]
                      [system-prompt "You are an intelligent and concise assistant."]
                      [color _ansi.reset]
@@ -156,11 +153,10 @@ Example usage:
   (let [sys (_system system-prompt)
         usr (_user prompt)
         stream (_completion client [sys usr] #** kwargs)]
-    (_output stream :print print :width width :margin margin :color color)))
+    (_output stream :print print :width width :color color)))
 
 (defmethod instruct [client #^ str prompt #^ HasCodeType obj *
                      [print True]
-                     [margin "  "]
                      [width None]
                      [system-prompt  "You are an intelligent, expert and concise senior programmer."]
                      [color _ansi.reset]
@@ -175,7 +171,7 @@ Example usage:
 
 {source}")
         stream (_completion client [sys usr] #** kwargs)]
-    (_output stream :print print :width width :margin margin :color color)))
+    (_output stream :print print :width width :color color)))
 
 ;; TODO use template files like pugsql
 
@@ -257,16 +253,14 @@ Example usage:
 (defn _fprint [s]
   (print s :flush True :end ""))
 
-(defn _print-stream [stream * [width None] [margin "  "] [bg "dark"] [color _ansi.reset]]
+(defn _print-stream [stream * [width None] [bg "dark"] [color _ansi.reset]]
   "Print a streaming chat completion.
   Applies syntax highlighting to the string inside a code fence.
   Any syntax-highlighted strings are printed as streamed."
   (let [term (shutil.get-terminal-size)
         w (if width (min width (- term.columns 5))
                     (- term.columns 5))]     
-    (setv text "\n")
-
-    ;(print margin :end color)
+    (setv text "")
     (_fprint color)
 
     (for [content stream]
@@ -309,62 +303,11 @@ Example usage:
                   (except [pygments.util.ClassNotFound]
                     (guess-lexer code)))
                 (guess-lexer code))]
-    ;(print f"{_ansi.i}{_ansi.b}{_ansi.green}{fence}{lang}{_ansi.reset}")
-    ;(_fprint _ansi.reset)
     (_fprint (highlight code lexer formatter))
     text)) ; return any trailing text
-    ;(print f"{_ansi.i}{_ansi.b}{_ansi.green}{fence}\n{_ansi.reset}" :end ""))); closing fence
-
-(defn _XXX_REMOVE_IMPLEMENTS_WRAPPING_print-stream [stream * [width None] [margin "  "] [bg "dark"] [color _ansi.reset]]
-  "Print a streaming chat completion code block with syntax highlighting."
-  (let [formatter (TerminalFormatter :bg bg :stripall True)
-        term (shutil.get-terminal-size)
-        w (if width (min width (- term.columns 5))
-                    (- term.columns 5))]     
-    (setv line "")
-
-    (for [content stream]
-      (+= line content) ; accumulate lines
-
-      (if (_is-code-fence content) 
-        (do
-          (print content :end "\r\033[K")
-          (setv in-code-block (not in-code-block))
-          ;; opening fence ignored
-          ;; closing fence flushes output
-          (unless in-code-block
-            (let [lines (.split line "\n")
-                  lang (cut (first lines) 3 None)
-                  code (.join "\n" (cut lines 1 -1))
-                  lexer (if lang
-                          (try
-                            (get-lexer-by-name lang)
-                            (except [pygments.util.ClassNotFound]
-                              (guess-lexer code)))
-                          (guess-lexer code))]
-              (print "\r")
-              (print (.strip (highlight code lexer formatter)))
-              (print color :end ""))
-            (setv line "")))
-
-        (unless in-code-block
-          (cond (.endswith content "\n")
-                (do
-                  (print f"{content}{margin}" :end "")
-                  (setv line ""))
-
-                (> (+ (len line) (len margin)) w)
-                (do (print f"\n{margin}{(.strip content)}" :end "")
-                    (setv line (.strip content)))
-
-                :else
-                (print content :end "" :flush True)))))
-
-    (print _ansi.reset)))
 
 ;; * the Tabby API client
 ;; ----------------------------------------------------
-
 
 (defclass TabbyClient [OpenAI]
   "A REPL-facing client for TabbyAPI (https://github.com/theroyallab/tabbyAPI).
