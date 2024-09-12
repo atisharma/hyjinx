@@ -12,6 +12,7 @@ Compatible with Hy 0.29.0.
 - Pretty tracebacks with correct syntax highlighting for hy or python
 - Print/get/edit source code of a function, module etc.
 - In-repl code analysis and discussion using LLMs (e.g. for writing docstrings)
+- In-repl syntax highlighting and latex rendering (for [sixel-capable terminals](https://www.arewesixelyet.com)) for LLM replies
 - A sensible `defmethod`
 - Numpy array pretty printing
 - A zmq lazy pirate protocol
@@ -57,6 +58,8 @@ For syntax highlighting in the REPL, put
 in your .hyrc.
 
 See hyjinx.hyrc for example usage.
+
+For in-terminal sixel rendering of latex in LLM replies, make sure pdflatex, dvipng and img2sixel are installed, and that you're using a sixel-capable terminal.
 
 
 ### Optional dependencies

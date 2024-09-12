@@ -19,6 +19,8 @@ Features:
 - instruct: Generic instruction method for the assistant.
 - TabbyClient: Implementation of a client to interact with TabbyAPI for model management and
   streaming completions.
+- latex highlighting, if pdflatex, dvipng and img2sixel are installed and you're using a
+  sixel-capable terminal.
 
 Functions:
 - `converse`: Chat over a list of messages and update in-place the message list.
@@ -66,12 +68,16 @@ Example usage:
 "
 
 (import re)
+(import os)
+(import subprocess)
+(import shutil)
+(import tempfile [TemporaryDirectory])
 
 (require hyrule [-> ->> unless of])
 (require hyjinx.macros [defmethod rest lmap])
 
 (import hyrule [pformat])
-(import hyjinx.lib [first last hash-color])
+(import hyjinx.lib [first last hash-color spit])
 (import hyjinx.inspect [getsource])
 (import hyjinx.source [get-source-details])
 (import pygments)
@@ -107,7 +113,7 @@ Example usage:
 ;; -----------------------------------------------------------------------------
 
 (defmethod converse [client #^ (of list dict) messages #^ ContentType content *
-                     [system-prompt "You are an intelligent and concise assistant."]
+                     [system-prompt "You will play the part of an intelligent and concise assistant."]
                      [color None]
                      #** kwargs]
   "Chat over a list of messages and update in-place the message list.
@@ -124,7 +130,7 @@ Example usage:
         width (.pop kwargs "width" None)
         [output-1 output-2] (tee (_completion
                                    client
-                                   [sys #* messages usr]
+                                   [sys #* messages usr] ; FIXME: some models don't allow system prompt
                                    #** kwargs))]
     (_output output-1
              :print True
@@ -146,7 +152,7 @@ Example usage:
 (defmethod instruct [client #^ str prompt *
                      [print True]
                      [width None]
-                     [system-prompt "You are an intelligent and concise assistant."]
+                     [system-prompt "You will play the part of an intelligent and concise assistant."]
                      [color _ansi.reset]
                      #** kwargs]
   "Just ask a general instruction or question, no object, no chat."
@@ -158,7 +164,7 @@ Example usage:
 (defmethod instruct [client #^ str prompt #^ HasCodeType obj *
                      [print True]
                      [width None]
-                     [system-prompt  "You are an intelligent, expert and concise senior programmer."]
+                     [system-prompt  "You will play the part of an intelligent, expert and concise senior programmer."]
                      [color _ansi.reset]
                      #** kwargs]
   "Instruct a hy or python object's source code."
@@ -236,7 +242,7 @@ Example usage:
 (defn _start-code-fence [s]
   "Check if the stream chunk starts a code block.
   Uses either three backticks or three tildes after a newline, with optional language specifier."
-  (re.search r"(```|~~~)\s*([\w]+)?[\r\n]+(.*)" s)) ; Claude doesn't split chunks at end of line
+  (re.search r"(```|~~~)\s*([\w-]+)?[\r\n]+(.*)" s)) ; Claude doesn't split chunks at end of line
   ;(re.search r"(```|~~~)\s*([\w]*)\n$" s))
   
 (defn _end-code-fence [s]
@@ -244,6 +250,47 @@ Example usage:
   Uses either three backticks or three tildes after a newline."
   (re.search r"[\n\r\f](```|~~~)[\n\r\f]+(.*)" s))  ; Claude doesn't split chunks at end of line
   ;(re.search r"[\n\r\f](```|~~~)[\n\r\f]" s))  ; Claude doesn't split chunks at end of line
+
+(defn _latex-expr [s]
+  "Check if the stream chunk ends a latex expression. Uses \\( and \\[."
+  ;; see https://stackoverflow.com/questions/14182879/regex-to-match-latex-equations
+  ;; and https://regex101.com/r/wP2aV6/25
+  (re.search r"
+(?<!\\)    # negative look-behind to make sure start is not escaped 
+(?:        # start non-capture group for all possible match starts
+  # group 1, match dollar signs only 
+  # single or double dollar sign enforced by look-arounds
+  ((?<!\$)\${1,2}(?!\$))|
+  # group 2, match escaped parenthesis
+  (\\\()|
+  # group 3, match escaped bracket
+  (\\\[)|                 
+  # group 4, match begin equation
+  (\\begin\{equation\})
+)
+# if group 1 was start
+(?(1)
+  # non greedy match everything in between
+  # group 1 matches do not support recursion
+  (.*?)(?<!\\)
+  # match ending double or single dollar signs
+  (?<!\$)\1(?!\$)|  
+# else
+(?:
+  # greedily and recursively match everything in between
+  # groups 2, 3 and 4 support recursion
+  #(.*(?R)?.*)(?<!\\)
+  (.?.*)(?<!\\)
+  (?:
+    # if group 2 was start, escaped parenthesis is end
+    (?(2)\\\)|  
+    # if group 3 was start, escaped bracket is end
+    (?(3)\\\]|     
+    # else group 4 was start, match end equation
+    \\end\{equation\}
+  )
+))))
+  " s re.X))
 
 (defn _output [stream * [print True] #** kwargs]
   (if print
@@ -259,24 +306,42 @@ Example usage:
   Any syntax-highlighted strings are printed as streamed."
   (let [term (shutil.get-terminal-size)
         w (if width (min width (- term.columns 5))
-                    (- term.columns 5))]     
-    (setv text "")
+                    (- term.columns 5))     
+        sixel (and (shutil.which "pdflatex")
+                   (shutil.which "dvipng")
+                   (shutil.which "img2sixel"))]
+    (setv code-text "")
+    (setv latex-text "")
     (_fprint color)
 
     (for [content stream]
-      (+= text content) ; accumulate content into text
-      (let [match (_start-code-fence text)] ; check on each streamed token
-        (if match
+      (+= code-text content) ; accumulate content into code-text
+      (+= latex-text content) ; accumulate content into latex-text
+      (let [code-match (_start-code-fence code-text) ; check on each streamed token
+            latex-match (when sixel (_latex-expr latex-text))]
+        (cond
+
+          code-match
           (do
-            (print (cut content (- (len (match.group 3))))) ; the bit before the opening fence, add newline lost in regex
-            (setv text "")
+            (print (cut content (- (len (code-match.group 3))))) ; the bit before the opening fence, add newline lost in regex
+            (setv code-text "")
             ;; what isn't already printed goes to the other function
             (let [trailing (_print-code-block stream
                                               :bg bg 
-                                              :fence (match.group 1) 
-                                              :lang (match.group 2) 
-                                              :code (match.group 3))]
+                                              :fence (code-match.group 1) 
+                                              :lang (code-match.group 2) 
+                                              :code (code-match.group 3))]
               (_fprint (+ color trailing color))))
+
+          latex-match
+          (do
+            ;; we'll have the same problem of trailing tokens here...
+            (_fprint content)
+            (_print-latex-expr (latex-match.group 0) :bg bg)
+            (_fprint color)
+            (setv latex-text ""))
+
+          :else
           (_fprint content))))
 
     (print _ansi.reset)))
@@ -305,6 +370,45 @@ Example usage:
                 (guess-lexer code))]
     (_fprint (highlight code lexer formatter))
     text)) ; return any trailing text
+
+(defn _print-latex-expr [expr * [bg "dark"] [dpi "200"] [timeout 4]]
+  "Shell out to print sixel generated from a latex expression."
+  ;; see latex2sixel, https://github.com/nilqed/latex2sixel/
+  (with [tmpdir (TemporaryDirectory)]
+    (let [tex-str (.join "\n" [r"\documentclass[12pt]{article}"
+                               r"\usepackage{amsmath,amssymb}"
+                               r"\usepackage{breqn}"
+                               r"\pagestyle{empty}"
+                               r"\begin{document}"
+                               expr
+                               r"\end{document}"])
+          tex (os.path.join tmpdir "hyjinx.tex")
+          png (os.path.join tmpdir "hyjinx.png")
+          dvi (os.path.join tmpdir "hyjinx.dvi")
+          logfile (os.path.join tmpdir "hyjinx.log")]
+      (spit tex tex-str)
+      (subprocess.run ["pdflatex"
+                       "-output-format=dvi"
+                       ;"-jobname=hyjinx"
+                       f"-output-directory={tmpdir}"
+                       "-interaction=nonstopmode"
+                       tex]
+                      :capture-output True
+                      :encoding "utf-8"
+                      :timeout timeout)
+      (subprocess.run ["dvipng" 
+                       "-T" "bbox" 
+                       "-D" (str 200) ; we are guessing the DPI
+                       "-O" "-1.5cm,-1.8cm" 
+                       "-q" 
+                       f"-o" png
+                       "-fg" (if (= bg "dark") "White" "Black")
+                       "-bg" (if (= bg "dark") "Black" "White")
+                       dvi] 
+                      :capture-output True
+                      :timeout timeout)  
+      (print :flush True)
+      (subprocess.run ["img2sixel" png] :capture-output False :timeout timeout))))
 
 ;; * the Tabby API client
 ;; ----------------------------------------------------
