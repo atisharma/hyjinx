@@ -1,4 +1,4 @@
-"
+"""
 🦑 - Functions and macros for modern living in the Hy REPL.
 
 hyjinx.lib - a smorgasbord of convenience functions.
@@ -15,7 +15,7 @@ hyjinx.[zmq_client, zmq_server, crypto, wire] - lazy-pirate zmq RPC architecture
 (depends on openai and/or anthropic)
 hyjinx.llm - discuss code with a Large Language Model (AI). TabbyAPI and OpenAI-compatible are supported.
 
-"
+"""
 
 import hy
 
