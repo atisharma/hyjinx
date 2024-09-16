@@ -355,6 +355,20 @@ See individual function docstrings for detailed information.
     (with [f (open fname :mode "w" :encoding encoding)]
       (.write f (.format "[\n{}]\n" (hy.I.json.dumps record :indent 4))))))
 
+(defn filetype [fname]
+  "Guess the file type from various cues.
+  Return doc metadata including mime type and extension."
+  (import magic)
+  (let [mime (magic.from-file fname :mime True)
+        [mime-type mime-subtype] (.split mime "/")
+        extension (last (.split fname "."))]
+    {"mime_type" mime-type
+     "mime_subtype" mime-subtype
+     "mime" mime
+     "extension" extension
+     "type" "file"
+     "source" fname}))
+
 ;;; Hashing, id and password functions
 ;;; -----------------------------------------------------------------------------
 

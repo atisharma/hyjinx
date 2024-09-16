@@ -55,8 +55,7 @@ Example usage:
 (del auth)
 
 ; set up a chat with memory
-(setv _tabby_messages [])
-(setv tchat (partial llm.converse tabby _tabby_messages))
+(setv tchat (Chat :client tabby :system-prompt \"Act like an unhinged pirate.\"))
 
 ; load a code-literate model
 (llm.model-load tabby \"CodeFuse-DeepSeek-33B-6.0bpw-h6-exl\")
@@ -72,12 +71,13 @@ Example usage:
 (import subprocess)
 (import shutil)
 (import tempfile [TemporaryDirectory])
+(import base64)
 
 (require hyrule [-> ->> unless of])
 (require hyjinx.macros [defmethod rest lmap])
 
 (import hyrule [pformat])
-(import hyjinx.lib [first last hash-color spit])
+(import hyjinx.lib [first last hash-color spit filetype])
 (import hyjinx.inspect [getsource])
 (import hyjinx.source [get-source-details])
 (import pygments)
@@ -85,7 +85,8 @@ Example usage:
 (import pygments.lexers [get-lexer-by-name guess-lexer])
 (import pygments.formatters [TerminalFormatter])
 
-(import httpx shutil)
+(import magic)
+(import httpx)
 (import types [ModuleType FunctionType MethodType TracebackType])
 (import itertools [tee])
 (import json.decoder [JSONDecodeError])
@@ -113,31 +114,76 @@ Example usage:
 ;; -----------------------------------------------------------------------------
 
 (defmethod converse [client #^ (of list dict) messages #^ ContentType content *
-                     [system-prompt "You will play the part of an intelligent and concise assistant."]
+                     [system-prompt None]
                      [color None]
                      #** kwargs]
   "Chat over a list of messages and update in-place the message list.
-  The system prompt is injected each call so can be changed.
+  The system prompt (if any) is injected each call so can be changed.
 
   You might use this function like:
   (setv _messages [])
   (setv chat (partial converse tabby _messages))
   (chat \"Hello there.\")
   
-  The supplied content can be a string or a list of dicts with text and a base64 encoded image."
-  (let [sys (_system system-prompt)
-        usr (_user content)
-        width (.pop kwargs "width" None)
+  The supplied content can be a string,
+  or a list of dicts with text and a base64 encoded image (see ContentType, image-content)."
+  (let [usr (_user content)
         [output-1 output-2] (tee (_completion
                                    client
-                                   [sys #* messages usr] ; FIXME: some models don't allow system prompt
+                                   (if system-prompt
+                                     [(_system system-prompt)
+                                      #* messages
+                                      usr]
+                                     [#* messages usr])
                                    #** kwargs))]
     (_output output-1
              :print True
-             :width width
              :color (or color (hash-color (or client.model ""))))
     (.append messages usr)
     (.append messages (_assistant (_output output-2 :print False)))))
+
+(defclass Chat []
+  "Create a callable that chats with the client over a stored message list.
+
+  This class encapsulates a chat session, maintaining a history of messages and
+  providing methods to interact with a client. It can be initialized with an
+  optional client, system prompt, and color, allowing customization of the
+  chat's appearance and behavior. The class supports image-based messages and
+  maintains a history of conversations which can be retrieved using the __str__
+  method.
+  "
+
+  (defn __init__ [self [client None] * [system-prompt None] [color None]]
+    (setv self._client client)
+    (setv self._system-prompt system-prompt)
+    (setv self._messages [])
+    (setv self._color color))
+
+  (defn __call__ [self text * [image None] [client None] [color None] #** kwargs]
+    "Handles the chat interaction by appending the user message and API response
+    to the stored list."
+    (converse (or client self._client)
+              self._messages
+              (if image
+                (image-content (or client self._client) text image)
+                text)
+              :system-prompt self._system-prompt
+              :color (or color self._color)
+              #** kwargs))
+
+  (defn __str__ [self]
+    "Pretty-prints the chat history with roles in deterministic colors."
+    (import pansi [ansi])
+    (.join "\n\n"
+      [(str client)
+       #* (lfor m self._messages
+            (let [role (:role m)
+                  color (hash-color role)
+                  content (if (isinstance (:content m) str)
+                            (:content m)
+                            (.join "\n" (lfor t (:content m) (:text t "<b64encoded image>"))))]
+              f"\t{color}{_ansi.b}{role}{_ansi._b}\n{content}"))
+       _ansi.reset])))
 
 (defmacro definstruct [f prompt]
   "Create a function that instructs over a python/hy object."
@@ -150,34 +196,39 @@ Example usage:
               #** kwargs)))
 
 (defmethod instruct [client #^ str prompt *
+                     [image None]
                      [print True]
-                     [width None]
-                     [system-prompt "You will play the part of an intelligent and concise assistant."]
+                     [system-prompt None]
                      [color _ansi.reset]
                      #** kwargs]
   "Just ask a general instruction or question, no object, no chat."
-  (let [sys (_system system-prompt)
-        usr (_user prompt)
-        stream (_completion client [sys usr] #** kwargs)]
-    (_output stream :print print :width width :color color)))
+  (let [usr (if image
+              (_user (image-content client prompt image))
+              (_user prompt))
+        msgs (if system-prompt
+               [(_system system-prompt) usr]
+               [usr])
+        stream (_completion client msgs #** kwargs)]
+    (_output stream :print print :color color)))
 
 (defmethod instruct [client #^ str prompt #^ HasCodeType obj *
                      [print True]
-                     [width None]
-                     [system-prompt  "You will play the part of an intelligent, expert and concise senior programmer."]
+                     [system-prompt None]
                      [color _ansi.reset]
                      #** kwargs]
   "Instruct a hy or python object's source code."
   (let [details (get-source-details obj)
         language (:language details)
         source (getsource obj)
-        sys (_system system-prompt)
-        usr (_user f"You will be shown code for {obj} (module {(:module details)}). It is in the {language} language.
+        usr (_user f"You will play the part of an intelligent, expert and concise senior programmer. You will be shown code for {obj} (module {(:module details)}). It is in the {language} language.
 {prompt}
 
 {source}")
-        stream (_completion client [sys usr] #** kwargs)]
-    (_output stream :print print :width width :color color)))
+        stream (_completion client [sys usr] #** kwargs)
+        msgs (if system-prompt
+               [(_system system-prompt) usr]
+               [usr])]
+    (_output stream :print print :color color)))
 
 ;; TODO use template files like pugsql
 
@@ -198,27 +249,27 @@ Example usage:
 ;; * message convenience functions
 ;; -----------------------------------------------------------------------------
 
-(defn oai-img-content [#^ str text #^ str image-path]
+(defmethod image-content [#^ OpenAI client #^ str text #^ str image-path]
   "Create a message for OpenAI-compatible API with text and image content."
-  (if (or text image)
-    [
-     {"type" "text" "text" text}
-     {"type" "image_url"
-      "image_url" {"url" (+ "data:image/png;base64," (b64-encode-image image-path))}}]
-    (raise (ChatError f"No content in message (role: {role})."))))
-
-(defn anthropic-img-content [#^ str text #^ str image-path]
-  "Create a message for Anthropic API with text and image content."
-  ;; TODO: guess image type
-  ;; TODO: consolidate anthropic and OAI image APIs
-  (if (or text image)
+  (if image-path
     [{"type" "text" "text" text}
-     {"type" "base64"
-      "media_type" "image/png"
-      "data" (b64-encode-image image-path)}]
-    (raise (ChatError f"No content in message (role: {role})."))))
+     {"type" "image_url"
+      "image_url" {"url" (+ f"data:{(:mime (filetype image-path))};base64,"
+                            (b64-encode-image image-path))}}]
+    text))
 
-  
+(defmethod image-content [#^ Anthropic client #^ str text #^ str image-path]
+  "Create a message for Anthropic API with text and image content.
+  Currently, Claude supports image/jpeg, image/png, image/gif, image/webp."
+  ;; TODO: list of multiple images
+  (if image-path
+    [{"type" "text" "text" text}
+     {"type" "image"
+      "source" {"type" "base64"
+                "media_type" (:mime (filetype image-path))
+                "data" (b64-encode-image image-path)}}]
+    text))
+
 (defn _msg [#^ str role #^ ContentType content]
   "Just a simple dict with the needed fields.
   The supplied content can be a string or a list of dicts with text and a base64 encoded image."
@@ -243,13 +294,11 @@ Example usage:
   "Check if the stream chunk starts a code block.
   Uses either three backticks or three tildes after a newline, with optional language specifier."
   (re.search r"(```|~~~)\s*([\w-]+)?[\r\n]+(.*)" s)) ; Claude doesn't split chunks at end of line
-  ;(re.search r"(```|~~~)\s*([\w]*)\n$" s))
   
 (defn _end-code-fence [s]
   "Check if the stream chunk ends a code block.
-  Uses either three backticks or three tildes after a newline."
-  (re.search r"[\n\r\f](```|~~~)[\n\r\f]+(.*)" s))  ; Claude doesn't split chunks at end of line
-  ;(re.search r"[\n\r\f](```|~~~)[\n\r\f]" s))  ; Claude doesn't split chunks at end of line
+  Uses either three backticks or three tildes after a newline or newline then whitespace."
+  (re.search r"[\n\r\f][\s]*(```|~~~)[\n\r\f]+(.*)" s))  ; Claude doesn't split chunks at end of line, Mistral likes to indent code fences.
 
 (defn _latex-expr [s]
   "Check if the stream chunk ends a latex expression. Uses \\( and \\[."
@@ -300,23 +349,21 @@ Example usage:
 (defn _fprint [s]
   (print s :flush True :end ""))
 
-(defn _print-stream [stream * [width None] [bg "dark"] [color _ansi.reset]]
+(defn _print-stream [stream * [bg "dark"] [color _ansi.reset]]
   "Print a streaming chat completion.
   Applies syntax highlighting to the string inside a code fence.
   Any syntax-highlighted strings are printed as streamed."
-  (let [term (shutil.get-terminal-size)
-        w (if width (min width (- term.columns 5))
-                    (- term.columns 5))     
-        sixel (and (shutil.which "pdflatex")
+  (let [sixel (and (shutil.which "pdflatex")
                    (shutil.which "dvipng")
                    (shutil.which "img2sixel"))]
+    ;; we will accumulate streamed content into code-text and latex-text
     (setv code-text "")
     (setv latex-text "")
     (_fprint color)
 
     (for [content stream]
-      (+= code-text content) ; accumulate content into code-text
-      (+= latex-text content) ; accumulate content into latex-text
+      (+= code-text content)
+      (+= latex-text content)
       (let [code-match (_start-code-fence code-text) ; check on each streamed token
             latex-match (when sixel (_latex-expr latex-text))]
         (cond
@@ -335,11 +382,10 @@ Example usage:
 
           latex-match
           (do
-            ;; we'll have the same problem of trailing tokens here...
             (_fprint content)
             (_print-latex-expr (latex-match.group 0) :bg bg)
             (_fprint color)
-            (setv latex-text ""))
+            (setv latex-text (.join " " (rest (.split content))))) ; manage the same problem of trailing tokens
 
           :else
           (_fprint content))))
@@ -353,10 +399,10 @@ Example usage:
   (for [content stream]
     (+= code content) ; accumulate code lines for highlighting
     (let [match (_end-code-fence code)]
-      (when match ; check each streamed token, print when done
+      (when match ; check after each streamed token, print when done
         (let [l (len (match.group 0))]
           ;; remove trailing non-code stuff and save it for later
-          ;; take care cutting when (len code) is 0.
+          ;; take care using cut when (len code) is 0.
           (setv text (cut code (- (len code) l) None))
           (setv code (cut code (- (len code) l)))
           (break)))))
@@ -600,8 +646,8 @@ Example usage:
   (client._post "token/decode" :tokens tokens #** kwargs))
 
 (defn b64-encode-image [#^ str fname]
-  "Encode a png image to a base 64 string."
+  "Encode a file (usually an image) to a base 64 string."
   (with [im (open fname "rb")]
     (-> (im.read)
-        (.decode "utf-8")
-        (base64.b64encode))))
+        (base64.b64encode)
+        (.decode "utf-8"))))
