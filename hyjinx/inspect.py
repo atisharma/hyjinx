@@ -92,12 +92,13 @@ def getfile(object):
         else:
             raise TypeError('{!r} is an unhandled partial'.format(object))
     elif isExpression(object):
-        if hasattr(object, 'filename'):
-            return object.filename
-        else:
-            raise OSError('source code not available')
-    else:
+        raise OSError('source code not available')
+    elif any([ismodule(object), isclass(object), ismethod(object), isfunction(object), istraceback(object), isframe(object), iscode(object)]):
         return inspect.getfile(object)
+    else:
+        raise TypeError('module, class, method, multimethod, partial, function, '
+                        'traceback, frame, code, or Hy expression object was '
+                        'expected, got {}'.format(type(object).__name__))
 
 def getsourcefile(object):
     """Return the filename that can be used to locate an object's source.

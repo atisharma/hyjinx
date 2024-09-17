@@ -41,9 +41,10 @@ Utilities for code inspection and presentation.
   ;; TODO : arguments to emacsclient are not handled
   (let [line (:line (get-source-details obj))
         editor (os.getenv "HYJINX_EDITOR" (os.getenv "EDITOR" f"vi +{line}"))
-        editor_args (os.getenv "HYJINX_EDITOR_ARGS" "")]
+        editor_args (os.getenv "HYJINX_EDITOR_ARGS" "")
+        command (.strip (.replace editor "{line}" (str line)))]
     (try
-      (subprocess.run [(.replace editor "{line}" (str line)) #* editor_args (getsourcefile obj)] :check True))))
+      (subprocess.run [command #* editor_args (getsourcefile obj)] :check True))))
 
 (defn _get-lang-from-filename [filename]
   "Guess the language from the filename extension."
@@ -60,7 +61,7 @@ Utilities for code inspection and presentation.
                      :else obj.__module__)
         ext (last (.split file "."))
         lang (_get-lang-from-filename file)
-        ;; TODO : handle classes
+        ;; TODO : handle class instances
         lineno (if (and (hasattr obj "__code__")
                         (hasattr obj.__code__ "co_firstlineno"))
                    (- obj.__code__.co-firstlineno 1)
