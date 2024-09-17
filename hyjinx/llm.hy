@@ -70,8 +70,8 @@ Example usage:
 (import os)
 (import subprocess)
 (import shutil)
-(import tempfile [TemporaryDirectory])
 (import base64)
+(import tempfile [TemporaryDirectory])
 
 (require hyrule [-> ->> unless of])
 (require hyjinx.macros [defmethod rest lmap])

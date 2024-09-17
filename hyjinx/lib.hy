@@ -6,13 +6,12 @@ It includes functions for:
 * module reloading
 * function manipulation and composition
 * time and date operations
-* OS interactions
+* OS interaction
 * string manipulations
 * numeric operations
 * output and formatting
 * list and data structure manipulations
-* file I/O and pickling
-* JSON handling
+* file serialization (pickling, JSON)
 * hashing and deterministic uid generation
 
 See individual function docstrings for detailed information.
@@ -296,6 +295,12 @@ See individual function docstrings for detailed information.
     (with [o (f fname mode #** kwargs)]
       (o.write content))))
 
+(defn template [fname #** kwargs]
+  "Load a string template from a file and substitute in the named kwargs."
+  (-> fname
+      (slurp)
+      (.format #** kwargs)))
+                
 ;; * pickling
 ;; ----------------------------------------------------
 
