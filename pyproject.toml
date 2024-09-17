@@ -32,7 +32,7 @@ dependencies = [
     "pansi",
     "platformdirs",
     "pygments",
-    "multimethod"
+    "multimethod",
     "python-magic"
 ]
 

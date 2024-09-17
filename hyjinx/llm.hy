@@ -152,6 +152,7 @@ Example usage:
   maintains a history of conversations which can be retrieved using the __str__
   method.
   "
+  ;; TODO chat serialization (json with params)
 
   (defn __init__ [self [client None] * [system-prompt None] [color None]]
     (setv self._client client)
@@ -175,14 +176,14 @@ Example usage:
     "Pretty-prints the chat history with roles in deterministic colors."
     (import pansi [ansi])
     (.join "\n\n"
-      [(str client)
+      [(str self._client)
        #* (lfor m self._messages
             (let [role (:role m)
                   color (hash-color role)
                   content (if (isinstance (:content m) str)
                             (:content m)
                             (.join "\n" (lfor t (:content m) (:text t "<b64encoded image>"))))]
-              f"\t{color}{_ansi.b}{role}{_ansi._b}\n{content}"))
+              f"{color}{_ansi.b}{role}{_ansi._b}\n{(* "─" (len role))}\n{content}"))
        _ansi.reset])))
 
 (defmacro definstruct [f prompt]
