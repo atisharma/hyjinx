@@ -92,7 +92,7 @@ See individual function docstrings for detailed information.
 
 (defn ! [#* args]
   "Return the output of running a command in a shell."
-  (. (hy.I.subprocess.run (.join " " args)
+  (. (hy.I.subprocess.run args
                           :shell True
                           :capture-output True
                           :encoding "utf-8")
@@ -130,11 +130,9 @@ See individual function docstrings for detailed information.
                        :stdout hy.I.sys.stdout
                        :encoding "utf-8"))
 
-(defn edit [fname]
-  "Quick and dirty edit. Use system editor if defined, else vi."
-  (let [editor (os.getenv "EDITOR" "vi")]
-    (try
-      (hy.I.subprocess.run [editor fname] :check True))))
+(defn username []
+  "The user's username, on unix or Windows."
+  (os.environ.get "USER" (os.environ.get "USERNAME")))
 
 ;; * Strings
 ;; ----------------------------------------------------

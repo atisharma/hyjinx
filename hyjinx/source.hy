@@ -28,23 +28,31 @@ Utilities for code inspection and presentation.
 (import hyjinx.lib [slurp])
 
 
-(defn edit-source [obj * [editor None]]
-  "Quick and dirty edit of source file.
-  You could also call emacsclient or similar.
+(defn edit [obj * [editor None]] 
+  "Edit the source file of an object.
   Uses, in order of preference:
       - the editor command passed as an argument
       - the editor command set by $HYJINX_EDITOR
       - the system editor set by $EDITOR
       - vi +{line}
   It will replace any mention of '{line}' in the editor string with
-  the line number associated with `obj`."
-  ;; TODO : arguments to emacsclient are not handled
-  (let [line (:line (get-source-details obj))
-        editor (os.getenv "HYJINX_EDITOR" (os.getenv "EDITOR" f"vi +{line}"))
-        editor_args (os.getenv "HYJINX_EDITOR_ARGS" "")
-        command (.strip (.replace editor "{line}" (str line)))]
-    (try
-      (subprocess.run [command #* editor_args (getsourcefile obj)] :check True))))
+  the line number associated with `obj`, and any mention of '{file}'
+  with the filename.
+  For example, a sensible HYJINX_EDITOR environment variable to call
+  neovim over a socket is
+    `HYJINX_EDITOR=\"/usr/bin/nvim --server $nvim_sock --remote '{file}';
+     /usr/bin/nvim --server $nvim_sock --remote-send {line}gg\"`
+  "
+  (let [line (:line (get-source-details obj) 0)
+        fname (getsourcefile obj)
+        editor (or editor
+                   (->> f"vi +{line}"
+                     (os.getenv "EDITOR") 
+                     (os.getenv "VISUAL") 
+                     (os.getenv "HYJINX_EDITOR"))) 
+        command (.strip (.format editor :line (str line) :file fname))]
+    (for [c (.split command ";")]
+      (hy.I.subprocess.run [#* (.split c)] :check True))))
 
 (defn _get-lang-from-filename [filename]
   "Guess the language from the filename extension."

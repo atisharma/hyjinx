@@ -73,7 +73,7 @@ Example usage:
 (import base64)
 (import tempfile [TemporaryDirectory])
 
-(require hyrule [-> ->> unless of])
+(require hyrule [-> ->> unless of loop])
 (require hyjinx.macros [defmethod rest lmap])
 
 (import hyrule [pformat])
@@ -160,17 +160,19 @@ Example usage:
     (setv self._messages [])
     (setv self._color color))
 
-  (defn __call__ [self text * [image None] [client None] [color None] #** kwargs]
+  (defn __call__ [self [text None] * [image None] [client None] [color None] #** kwargs]
     "Handles the chat interaction by appending the user message and API response
     to the stored list."
-    (converse (or client self._client)
-              self._messages
-              (if image
-                (image-content (or client self._client) text image)
-                text)
-              :system-prompt self._system-prompt
-              :color (or color self._color)
-              #** kwargs))
+    (if text
+      (converse (or client self._client)
+                self._messages
+                (if image
+                  (image-content (or client self._client) text image)
+                  text)
+                :system-prompt self._system-prompt
+                :color (or color self._color)
+                #** kwargs)
+      (self.chat)))
 
   (defn __str__ [self]
     "Pretty-prints the chat history with roles in deterministic colors."
@@ -184,7 +186,20 @@ Example usage:
                             (:content m)
                             (.join "\n" (lfor t (:content m) (:text t "<b64encoded image>"))))]
               f"{color}{_ansi.b}{role}{_ansi._b}\n{(* "─" (len role))}\n{content}"))
-       _ansi.reset])))
+       _ansi.reset]))
+
+  (defn clear [self]
+    "Delete all the chat messages."
+    (.clear self._messages))
+
+  (defn chat [self]
+    "A back-and-forth chat that ends when an empty input is given."
+    (let [prompt f"{_ansi.BLUE}>{_ansi.reset}{_ansi.b} "]
+      (loop [[text (input prompt)]]
+        (print _ansi._b :end "")
+        (when text
+          (self.__call__ text)
+          (recur (input prompt)))))))
 
 (defmacro definstruct [f prompt]
   "Create a function that instructs over a python/hy object."
@@ -478,10 +493,13 @@ Example usage:
     (setv self._admin_key (.pop kwargs "admin_key" None))
     (.__init__ (super) #** kwargs))
 
-  (defn _get [self endpoint * [timeout 20]]
+  (defn _get [self endpoint * [admin False] [timeout 20]]
     "GET an authenticated endpoint or raise error."
-    (let [response (httpx.get (.join self.base-url endpoint)
-                              :headers {"x-api-key" self.api-key}
+    (let [auth (if admin
+                   {"x-api-key" self._admin-key}
+                   {"x-api-key" self.api-key})
+          response (httpx.get (.join self.base-url endpoint)
+                              :headers auth
                               :timeout timeout)]
       (if response.is-success
           (response.json)
@@ -547,7 +565,12 @@ Example usage:
 
 (defmethod models [#^ TabbyClient client]
   "List all models available to TabbyAPI."
-  (let [l (:data (client._get "models"))]
+  (let [l (:data (client._get "models" :admin True))]
+    (sorted (lfor m l (:id m)))))
+
+(defmethod draft-models [#^ TabbyClient client]
+  "List all draft models available to TabbyAPI."
+  (let [l (:data (client._get "model/draft/list" :admin True))]
     (sorted (lfor m l (:id m)))))
 
 (defmethod loras [#^ TabbyClient client]
@@ -572,12 +595,12 @@ Example usage:
 
 (defmethod templates [#^ TabbyClient client]
   "List all templates available to TabbyAPI."
-  (sorted (:data (client._get "templates"))))
+  (sorted (:data (client._get "templates" :admin True))))
 
 ;; * methods requiring admin authentication
 ;; ----------------------------------------------------
 
-(defmethod template-load [#^ TabbyClient client #^ str template]
+(defmethod template-switch [#^ TabbyClient client #^ str template]
   "Set the currently loaded template."
   (client._post "template/switch"
                 :admin True
@@ -634,6 +657,18 @@ Example usage:
   (client._post "lora/unload"
                 :admin True))
 
+(defmethod sampling-overrides [#^ TabbyClient client]
+  "List all currently applied sampler overrides."
+  (client._get "sampling/overrides" :admin True))
+
+(defmethod sampling-override-switch [#^ TabbyClient client #** schema]
+  "Switch the currently loaded override preset."
+  (client._post "sampling/override/switch" :admin True #** schema))
+
+(defmethod sampling-override-unload [#^ TabbyClient client]
+  "Unload the currently loaded override preset."
+  (client._post "sampling/override/unload" :admin True))
+
 (defmethod encode [#^ TabbyClient client #^ str text #** kwargs]
   "Encode a string into tokens.
   kwargs are passed to the API.
@@ -645,6 +680,9 @@ Example usage:
   kwargs are passed to the API.
   See the API docs for options determining handling of special tokens."
   (client._post "token/decode" :tokens tokens #** kwargs))
+
+;; * helper functions
+;; ------------------
 
 (defn b64-encode-image [#^ str fname]
   "Encode a file (usually an image) to a base 64 string."
