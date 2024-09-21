@@ -176,7 +176,6 @@ Example usage:
 
   (defn __str__ [self]
     "Pretty-prints the chat history with roles in deterministic colors."
-    (import pansi [ansi])
     (.join "\n\n"
       [(str self._client)
        #* (lfor m self._messages
@@ -195,11 +194,9 @@ Example usage:
   (defn chat [self]
     "A back-and-forth chat that ends when an empty input is given."
     (let [prompt f"{_ansi.BLUE}>{_ansi.reset}{_ansi.b} "]
-      (loop [[text (input prompt)]]
+      (while (setx text (input prompt))
         (print _ansi._b :end "")
-        (when text
-          (self.__call__ text)
-          (recur (input prompt)))))))
+        (self.__call__ text)))))
 
 (defmacro definstruct [f prompt]
   "Create a function that instructs over a python/hy object."
@@ -469,7 +466,7 @@ Example usage:
                        dvi] 
                       :capture-output True
                       :timeout timeout)  
-      (print :flush True)
+      (print "\n\n" :flush True)
       (subprocess.run ["img2sixel" png] :capture-output False :timeout timeout))))
 
 ;; * the Tabby API client
@@ -524,7 +521,7 @@ Example usage:
 ;; * generation methods requiring user authentication
 ;; ----------------------------------------------------
 
-(defmethod _completion [#^ OpenAI client messages * [stream True] [max-tokens 1000] #** kwargs]
+(defmethod _completion [#^ OpenAI client messages * [stream True] [max-tokens 5000] #** kwargs]
   "Generate a streaming completion using the chat completion endpoint."
   (let [stream (client.chat.completions.create
                  :model (.pop kwargs "model" (getattr client "model" "gpt-4-turbo"))
@@ -537,7 +534,7 @@ Example usage:
         (when text
           (yield text))))))
 
-(defmethod _completion [#^ Anthropic client messages * [stream True] [max-tokens 1000] #** kwargs]
+(defmethod _completion [#^ Anthropic client messages * [stream True] [max-tokens 5000] #** kwargs]
   "Generate a streaming completion using the messages endpoint."
   (let [system-messages (.join "\n"
                                (lfor m messages

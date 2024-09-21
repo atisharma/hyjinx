@@ -47,11 +47,11 @@ Macros for Flow Control
 ;; ----------------------------------------------------
 
 (defmacro rest [xs]
-  "A slice of all but the first of xs."
+  "A slice of all but the first element of a sequence."
   `(cut ~xs 1 None))
   
 (defmacro butlast [xs]
-  "A slice of all but the last of xs."
+  "A slice of all but the last element of a sequence."
   `(cut ~xs 0 -1))
   
 (defmacro .. [start end [step 1]]
@@ -77,12 +77,12 @@ Macros for Flow Control
   "Define a multimethod (using multimethod.multimethod).
   For example, the Hy code
 
-  (defmethod f [#^ int x #^ float y]
-    (// x (int y)))
+  `(defmethod f [#^ int x #^ float y]
+    (// x (int y)))`
 
-  is equivalent to the following python code:
+  is equivalent to the following Python code:
 
-  @multimethod
+  `@multimethod
   def f(x: int, y: float):
       return(x // int(y))`
   "
@@ -92,14 +92,13 @@ Macros for Flow Control
 (defmacro defproperty [f #* body]
   "Class method definition using the property decorator.
 
-  (defproperty p
-    2)
+  `(defproperty p 2)`
 
-  is equivalent to
+  is equivalent to the following Python code:
 
-  @property
+  `@property
   def p(self):
-    2
+    2`
   "
   `(defn [property] ~f [self] ~@body))
   
@@ -109,13 +108,13 @@ Macros for Flow Control
 (defmacro fixture [f #* body]
   "Function definition using pytest fixture decorator.
 
-  (fixture p 2)
+  `(fixture p 2)`
 
-  is equivalent to
+  is equivalent to the following Python code:
 
-  @pytest.fixture
+  `@pytest.fixture
   def p():
-    2
+    2`
   "
   `(defn [hy.I.pytest.fixture] ~f [] ~@body))
   
@@ -132,14 +131,14 @@ Macros for Flow Control
 ;; ----------------------------------------------------
 
 (defmacro defstruct [d #* body]
-  "Define a basic immutable dataclass.
+  "Define an immutable dataclass using the dataclass decorator.
   For example, the Hy code
 
-  (defdataclass D [#^ int x #^ float y])
+  `(defdataclass D [#^ int x #^ float y])`
 
-  is equivalent to
+  is equivalent to the following Python code:
 
-  @dataclass
+  `@dataclass
   class D:
       x: int
       y: float`
@@ -157,3 +156,15 @@ Macros for Flow Control
      ~@body
      (while ~condition
        ~@body)))
+
+(defmacro when-let [bindings #* body]
+  "Bind a value to a variable and execute code if the value is truthy.
+  For example,
+
+  `(when-let [x (get-dict my-dict :key)]
+     (print x))`"
+  (let [var (get bindings 0)
+        expr (get bindings 1)]
+    `(let [~var ~expr]
+       (when ~var
+         (do ~@body)))))

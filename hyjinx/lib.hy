@@ -22,6 +22,7 @@ See individual function docstrings for detailed information.
 
 (require hyjinx.macros [rest lmap])
 
+(import hy [mangle])
 (import functools *
         itertools *
         cytoolz [first second last drop partition identity]
@@ -45,15 +46,21 @@ See individual function docstrings for detailed information.
 (defn named-partial [f #* args #** kwargs]
   "Just functools.partial, but with a new function name set."
   (setv f-partial (partial f #* args #** kwargs))
-  (setv f-partial.__name__ (.join "_" [(name f) #*(map str args) #*(map str (flatten (.items kwargs)))]))
-  f-partial)
+  ;; FIXME: assumes everything is expressible as a string
+  (let [arg-names (map (fn [x] (mangle (str x)))
+                       args)
+        kwarg-names (map (fn [item] (mangle f"{(str (first item))}={(str (second item))}"))
+                         (.items kwargs))
+        new-name (.join "_" [f.__name__ #* arg-names #* kwarg-names])]
+    (setv f-partial.__name__ new-name)
+    f-partial))
 
 (defn compose [#* funcs]
   "Function composition, f ∘ g.
   E.g., after
-  (setv fg (compose f g)).
+  `(setv fg (compose f g))`
   then
-  (f (g x)) is equivalent to (fg x).
+  `(f (g x))` is equivalent to `(fg x)`.
   Arguments must have compatible input/output matchings."
   (reduce
     (fn [f g]
@@ -111,15 +118,17 @@ See individual function docstrings for detailed information.
   (os.listdir path))
 
 (defn grepp [regex lines * [line-nos False]]
-  "Get Regular Expression in python.
-  Return items in a string or iterable of strings (lines) that match a regular expression."
+  "Search for regular expressions in lines of text.
+  Return items in a string or iterable of strings (lines) that match a regular expression.
+  If `line-nos` is True, return the matching lines with their line numbers.
+  The default is False, which returns only the matching lines."
   (let [rx (re.compile regex)
-        ls (if (isinstance lines str)
-               (.split lines "\n")
-               lines)]
+        line-list (if (isinstance lines str)
+                    (.split lines "\n")
+                    lines)]
     (if line-nos
-      (lfor [ln l] (enumerate ls) :if (re.search regex l) f"{ln :04d}: {l}")
-      (lfor l ls :if (re.search regex l) l))))
+      (lfor [index line] (enumerate line-list) :if (re.search regex line) f"{index :04d}: {line}")
+      (lfor line line-list :if (re.search regex line) line))))
 
 (defn shell [[shell "bash"] #* args]
   "Run an interactive shell as a subprocess.
@@ -151,7 +160,10 @@ See individual function docstrings for detailed information.
               (.lower))))
 
 (defn similar [s1 s2 [threshold 0.8]] ; -> bool
-  "Two words are heuristically similar, based on Jaro-Winkler algorithm."
+  "Determine if two words are heuristically similar, based on the Jaro-Winkler algorithm.
+  The `threshold` parameter specifies the minimum similarity score to consider
+  the words as similar. The default is 0.8.
+  The comparison is case-insensitive."
   (import jaro)
   (let [cs1 (sstrip (str s1))
         cs2 (sstrip (str s2))
@@ -167,12 +179,14 @@ See individual function docstrings for detailed information.
   (str x)))
 
 (defn unicode-search [s]
-  "Search for unicode characters with s in the name."
+  "Search for Unicode characters whose names match the given substring `s`.
+  Iterates over the Unicode code points from 0 to 0x10000.
+  Prints the character's code point, category, name, and the character itself."
   (for [i (range 0x10000)]
     (let [char (chr i)
-          category (unicodedata.category char)
-          name (unicodedata.name char "")]
-      (when (or (in (.lower s) (.lower name)))
+          name (unicodedata.name char "")
+          category (unicodedata.category char)]
+      (when (in (.lower s) (.lower name))
         (print f"U+{i :04x} {category} {name} {char}")))))
 
 ;; * Numeric
@@ -267,11 +281,9 @@ See individual function docstrings for detailed information.
 (defn config [config-file]
   "Get values in a toml file like a hashmap."
   ;; requires python 3.11
-  (if (os.path.isfile config-file)
-    (-> config-file
-        (slurp)
-        (hy.I.tomllib.loads))
-    (raise (FileNotFoundError config-file))))
+  (-> config-file
+      (slurp)
+      (hy.I.tomllib.loads)))
 
 (defn slurp [fname #** kwargs]
   "Read a file and return as a string.
@@ -310,7 +322,8 @@ See individual function docstrings for detailed information.
         (hy.I.pickle.load f))))) 
 
 (defn psave [obj fname * [protocol -1]]
-  "Write an object as a pickle file."
+  "Write an object as a pickle file.
+  Defaults to the highest available protocol."
   (with [f (open fname :mode "wb")]
     (hy.I.pickle.dump obj f :protocol protocol)))
 
@@ -347,7 +360,7 @@ See individual function docstrings for detailed information.
  "Append / write a dict to a file as json.
   If the file does not exist, initialise a file with the record.
   If the file exists, append to it.
-  Cobbled together from https://stackoverflow.com/a/31224105
+ Cobbled together from https://stackoverflow.com/a/31224105
   it overwrites the closing ']' with the new record + a new ']'.
   POSIX expects a trailing newline. Assumes utf-8."
   (if (os.path.isfile fname)
@@ -363,8 +376,12 @@ See individual function docstrings for detailed information.
   Return doc metadata including mime type and extension."
   (import magic)
   (let [mime (magic.from-file fname :mime True)
-        [mime-type mime-subtype] (.split mime "/")
-        extension (last (.split fname "."))]
+        [mime-type mime-subtype] (if (in "/" mime)
+                                   (.split mime "/" 1)
+                                   mime)
+        extension (if (in "." fname)
+                   (last (.split fname "."))
+                   None)]
     {"mime_type" mime-type
      "mime_subtype" mime-subtype
      "mime" mime

@@ -22,10 +22,8 @@ import hy
 from hyjinx import inspect
 
 from hyjinx.lib import *
-# replace lib.edit with source.edit
 from hyjinx.source import *
 from hyjinx.docs import *
-from hyjinx.screen import Screen
 
 # numpy may not be installed
 try:
@@ -37,6 +35,7 @@ except ModuleNotFoundError:
 hy.macros.require('hyjinx.macros', None, assignments = 'ALL', prefix = '')
 
 # set the package version
+# the major.minor version simply match the assumed Hy version
 __version__ = "1.00.0"
 __version_info__ = __version__.split(".")
 

@@ -51,7 +51,7 @@ Utilities for code inspection and presentation.
                      (os.getenv "VISUAL") 
                      (os.getenv "HYJINX_EDITOR"))) 
         command (.strip (.format editor :line (str line) :file fname))]
-    (for [c (.split command ";")]
+    (for [c (.split command ";")] ; FIXME: this will fail with (e.g.) args containing ';'
       (hy.I.subprocess.run [#* (.split c)] :check True))))
 
 (defn _get-lang-from-filename [filename]
@@ -63,13 +63,12 @@ Utilities for code inspection and presentation.
     "py3tb" "py3tb"))
 
 (defn get-source-details [obj]
-  "Get line number, source file of obj."
+  "Return a dict with line number, source file of object, etc."
   (let [file (getsourcefile obj)
         module (cond (ismodule obj) obj.__name__
                      :else obj.__module__)
         ext (last (.split file "."))
         lang (_get-lang-from-filename file)
-        ;; TODO : handle class instances
         lineno (if (and (hasattr obj "__code__")
                         (hasattr obj.__code__ "co_firstlineno"))
                    (- obj.__code__.co-firstlineno 1)
