@@ -25,8 +25,8 @@ classifiers = [
     "Topic :: Utilities"
 ]
 dependencies = [
-    "hy==0.29.0",
-    "hyrule==0.6.0",
+    "hy==1.0.0"
+    "hyrule==0.7.0",
     "cytoolz",
     "more-itertools",
     "pansi",
