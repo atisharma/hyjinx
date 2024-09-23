@@ -192,11 +192,14 @@ Example usage:
     (.clear self._messages))
 
   (defn chat [self]
-    "A back-and-forth chat that ends when an empty input is given."
+    "A back-and-forth chat that ends when an empty input or EOF (Ctrl-D) is given."
     (let [prompt f"{_ansi.BLUE}>{_ansi.reset}{_ansi.b} "]
-      (while (setx text (input prompt))
-        (print _ansi._b :end "")
-        (self.__call__ text)))))
+      (try
+        (while (setx text (input prompt))
+          (print _ansi._b :end "")
+          (self.__call__ text))
+        (except [EOFError]
+          (print f"{_ansi.red}EOF{_ansi.reset}"))))))
 
 (defmacro definstruct [f prompt]
   "Create a function that instructs over a python/hy object."
