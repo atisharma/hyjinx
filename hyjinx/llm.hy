@@ -469,8 +469,9 @@ Example usage:
                        dvi] 
                       :capture-output True
                       :timeout timeout)  
-      (print "\n\n" :flush True)
-      (subprocess.run ["img2sixel" png] :capture-output False :timeout timeout))))
+      (print "\n" :flush True)
+      (subprocess.run ["img2sixel" png] :capture-output False :timeout timeout)
+      (print "\n" :flush True))))
 
 ;; * the Tabby API client
 ;; ----------------------------------------------------
@@ -524,7 +525,7 @@ Example usage:
 ;; * generation methods requiring user authentication
 ;; ----------------------------------------------------
 
-(defmethod _completion [#^ OpenAI client messages * [stream True] [max-tokens 5000] #** kwargs]
+(defmethod _completion [#^ OpenAI client messages * [stream True] [max-tokens 4000] #** kwargs]
   "Generate a streaming completion using the chat completion endpoint."
   (let [stream (client.chat.completions.create
                  :model (.pop kwargs "model" (getattr client "model" "gpt-4-turbo"))
@@ -537,7 +538,7 @@ Example usage:
         (when text
           (yield text))))))
 
-(defmethod _completion [#^ Anthropic client messages * [stream True] [max-tokens 5000] #** kwargs]
+(defmethod _completion [#^ Anthropic client messages * [stream True] [max-tokens 4000] #** kwargs]
   "Generate a streaming completion using the messages endpoint."
   (let [system-messages (.join "\n"
                                (lfor m messages

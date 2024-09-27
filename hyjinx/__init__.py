@@ -1,4 +1,10 @@
 """
+
+    ▌      ▖▗       
+    ▛▀▖▌ ▌▗▖▄ ▛▀▖▚▗▘
+    ▌ ▌▚▄▌ ▌▐ ▌ ▌▗▚ 
+    ▘ ▘▗▄▘▄▘▀▘▘ ▘▘ ▘
+
 🦑 - Functions and macros for modern living in the Hy REPL.
 
 hyjinx.lib - a smorgasbord of convenience functions.
@@ -36,7 +42,7 @@ hy.macros.require('hyjinx.macros', None, assignments = 'ALL', prefix = '')
 
 # set the package version
 # the major.minor version simply match the assumed Hy version
-__version__ = "1.00.0"
+__version__ = "1.0.1"
 __version_info__ = __version__.split(".")
 
 
