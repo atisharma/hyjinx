@@ -71,13 +71,13 @@ Example usage:
 (import subprocess)
 (import shutil)
 (import base64)
-(import tempfile [TemporaryDirectory])
+(import tempfile [TemporaryDirectory NamedTemporaryFile])
 
 (require hyrule [-> ->> unless of loop])
 (require hyjinx.macros [defmethod rest lmap])
 
 (import hyrule [pformat])
-(import hyjinx.lib [first last hash-color spit filetype])
+(import hyjinx.lib [first last hash-color spit filetype jload jsave])
 (import hyjinx.inspect [getsource])
 (import hyjinx.source [get-source-details])
 (import pygments)
@@ -85,30 +85,64 @@ Example usage:
 (import pygments.lexers [get-lexer-by-name guess-lexer])
 (import pygments.formatters [TerminalFormatter])
 
-(import magic)
 (import httpx)
 (import types [ModuleType FunctionType MethodType TracebackType])
 (import itertools [tee])
 (import json.decoder [JSONDecodeError])
-(import pansi [ansi :as _ansi])
+(import pansi [ansi])
 
 (try
-  (import openai [OpenAI])
+  (import openai [OpenAI :as _OpenAI])
   (except [ModuleNotFoundError]
-    (defclass OpenAI)))
+    (defclass _OpenAI)))
 
 (try
-  (import anthropic [Anthropic])
+  (import anthropic [Anthropic :as _Anthropic])
   (except [ModuleNotFoundError]
-    (defclass Anthropic)))
+    (defclass _Anthropic)))
+
+(try
+  (import huggingface-hub [InferenceClient :as _Huggingface])
+  (except [ModuleNotFoundError]
+    (defclass _Huggingface)))
 
 
-(defclass TabbyClientError [Exception])
-(defclass ChatError [Exception])
+(defclass TabbyClientError [RuntimeError])
+(defclass ChatError [RuntimeError])
+
+;; * Custom types
+;; -----------------------------------------------------------------------------
 
 (setv HasCodeType (| type ModuleType FunctionType MethodType TracebackType))
-(setv ClientType (| OpenAI Anthropic))
+(setv ClientType (| _OpenAI _Anthropic))
 (setv ContentType (| str (of list dict)))
+
+;; * Extend standard API clients
+;; ----------------------------------------------------
+
+(defclass OpenAI [_OpenAI]
+  "Extend OpenAI class to carry default generation parameters."
+
+  (defn __init__ [self #** kwargs]
+    "Initialise as for OpenAI, but optionally pass default generation parameters."
+    (setv self._defaults (.pop kwargs "params" {}))
+    (.__init__ (super) #** kwargs)))
+
+(defclass Anthropic [_Anthropic]
+  "Extend Anthropic class to carry default generation parameters."
+
+  (defn __init__ [self #** kwargs]
+    "Initialise as for Anthropic, but optionally pass default generation parameters."
+    (setv self._defaults (.pop kwargs "params" {}))
+    (.__init__ (super) #** kwargs)))
+
+(defclass Huggingface [_Huggingface]
+  "Extend Huggingface class to carry default generation parameters."
+
+  (defn __init__ [self #** kwargs]
+    "Initialise as for Huggingface, but optionally pass default generation parameters."
+    (setv self._defaults (.pop kwargs "params" {}))
+    (.__init__ (super) #** kwargs)))
 
 ;; * the actually useful functions 
 ;; -----------------------------------------------------------------------------
@@ -137,10 +171,10 @@ Example usage:
                                      [#* messages usr])
                                    #** kwargs))]
     (_output output-1
-             :print True
+             :echo True
              :color (or color (hash-color (or client.model ""))))
     (.append messages usr)
-    (.append messages (_assistant (_output output-2 :print False)))))
+    (.append messages (_assistant (_output output-2 :echo False)))))
 
 (defclass Chat []
   "Create a callable that chats with the client over a stored message list.
@@ -152,13 +186,13 @@ Example usage:
   maintains a history of conversations which can be retrieved using the __str__
   method.
   "
-  ;; TODO chat serialization (json with params)
 
-  (defn __init__ [self [client None] * [system-prompt None] [color None]]
+  (defn __init__ [self client [fname None] * [system-prompt None] [defaults {}] [color None]]
     (setv self._client client)
     (setv self._system-prompt system-prompt)
-    (setv self._messages [])
-    (setv self._color color))
+    (setv self._messages (if fname (jload fname) []))
+    (setv self._color color)
+    (setv self._defaults defaults))
 
   (defn __call__ [self [text None] * [image None] [client None] [color None] #** kwargs]
     "Handles the chat interaction by appending the user message and API response
@@ -171,6 +205,7 @@ Example usage:
                   text)
                 :system-prompt self._system-prompt
                 :color (or color self._color)
+                #** self._defaults
                 #** kwargs)
       (self.chat)))
 
@@ -178,14 +213,16 @@ Example usage:
     "Pretty-prints the chat history with roles in deterministic colors."
     (.join "\n\n"
       [(str self._client)
+       (.join "\n" (lfor [k v] (.items (| self._client._defaults self._defaults))
+                     f"{k}: {v}"))
        #* (lfor m self._messages
             (let [role (:role m)
                   color (hash-color role)
                   content (if (isinstance (:content m) str)
                             (:content m)
                             (.join "\n" (lfor t (:content m) (:text t "<b64encoded image>"))))]
-              f"{color}{_ansi.b}{role}{_ansi._b}\n{(* "─" (len role))}\n{content}"))
-       _ansi.reset]))
+              f"{color}{ansi.b}{role}{ansi._b}\n{(* "─" (len role))}\n{content}"))
+       ansi.reset]))
 
   (defn clear [self]
     "Delete all the chat messages."
@@ -193,29 +230,38 @@ Example usage:
 
   (defn chat [self]
     "A back-and-forth chat that ends when an empty input or EOF (Ctrl-D) is given."
-    (let [prompt f"{_ansi.BLUE}>{_ansi.reset}{_ansi.b} "]
+    (let [prompt f"{ansi.BLUE}>{ansi.reset}{ansi.b} "]
       (try
         (while (setx text (input prompt))
-          (print _ansi._b :end "")
+          (print ansi._b :end "")
           (self.__call__ text))
         (except [EOFError]
-          (print f"{_ansi.red}EOF{_ansi.reset}"))))))
+          (print f"{ansi.red}EOF{ansi.reset}")))))
+
+  (defn save [self fname]
+    "Save the messages (only) in json format to fname."
+    (jsave self._messages fname))
+
+  (defn load [self fname]
+    "Load the messages (only) in json format to fname.
+    Be warned! This will replace the current conversation."
+    (setv self._messages (jload fname))))
 
 (defmacro definstruct [f prompt]
   "Create a function that instructs over a python/hy object."
-  `(defn ~f [client obj * [print True] #** kwargs]
+  `(defn ~f [client obj * [echo True] #** kwargs]
      ~prompt
      (instruct client
               ~prompt
               obj
-              :print print
+              :echo echo
               #** kwargs)))
 
 (defmethod instruct [client #^ str prompt *
                      [image None]
-                     [print True]
+                     [echo True]
                      [system-prompt None]
-                     [color _ansi.reset]
+                     [color ansi.reset]
                      #** kwargs]
   "Just ask a general instruction or question, no object, no chat."
   (let [usr (if image
@@ -225,12 +271,12 @@ Example usage:
                [(_system system-prompt) usr]
                [usr])
         stream (_completion client msgs #** kwargs)]
-    (_output stream :print print :color color)))
+    (_output stream :echo echo :color color)))
 
 (defmethod instruct [client #^ str prompt #^ HasCodeType obj *
-                     [print True]
+                     [echo True]
                      [system-prompt None]
-                     [color _ansi.reset]
+                     [color ansi.reset]
                      #** kwargs]
   "Instruct a hy or python object's source code."
   (let [details (get-source-details obj)
@@ -240,11 +286,11 @@ Example usage:
 {prompt}
 
 {source}")
-        stream (_completion client [sys usr] #** kwargs)
         msgs (if system-prompt
                [(_system system-prompt) usr]
-               [usr])]
-    (_output stream :print print :color color)))
+               [usr])
+        stream (_completion client msgs #** kwargs)]
+    (_output stream :echo echo :color color)))
 
 ;; TODO use template files like pugsql
 
@@ -357,15 +403,15 @@ Example usage:
 ))))
   " s re.X))
 
-(defn _output [stream * [print True] #** kwargs]
-  (if print
+(defn _output [stream * [echo True] #** kwargs]
+  (if echo
       (_print-stream stream #** kwargs)
       (.join "" stream)))
 
 (defn _fprint [s]
   (print s :flush True :end ""))
 
-(defn _print-stream [stream * [bg "dark"] [color _ansi.reset]]
+(defn _print-stream [stream * [bg "dark"] [color ansi.reset]]
   "Print a streaming chat completion.
   Applies syntax highlighting to the string inside a code fence.
   Any syntax-highlighted strings are printed as streamed."
@@ -406,7 +452,7 @@ Example usage:
           :else
           (_fprint content))))
 
-    (print _ansi.reset)))
+    (print ansi.reset)))
 
 (defn _print-code-block [stream * [fence "```"] [lang ""] [code ""] [bg "dark"]]
   "Applies syntax highlighting to a streaming chat completion,
@@ -504,7 +550,7 @@ Example usage:
                               :timeout timeout)]
       (if response.is-success
           (response.json)
-          (raise (TabbyClientError f"{_ansi.red}{response.status-code}\n{(pformat (:detail (response.json)) :indent 2)}{_ansi.reset}")))))
+          (raise (TabbyClientError f"{ansi.red}{response.status-code}\n{(pformat (:detail (response.json)) :indent 2)}{ansi.reset}")))))
 
   (defn _post [self endpoint * [admin False] [timeout 20] #** data]
     "POST to an authenticated endpoint or raise error."
@@ -520,7 +566,7 @@ Example usage:
             (.json response)
             (except [e [JSONDecodeError TypeError]]
               response))
-          (raise (TabbyClientError f"{_ansi.red}{response.status-code}\n{(pformat (:detail (response.json)) :indent 2)}{_ansi.reset}"))))))
+          (raise (TabbyClientError f"{ansi.red}{response.status-code}\n{(pformat (:detail (response.json)) :indent 2)}{ansi.reset}"))))))
 
 ;; * generation methods requiring user authentication
 ;; ----------------------------------------------------
@@ -528,15 +574,47 @@ Example usage:
 (defmethod _completion [#^ OpenAI client messages * [stream True] [max-tokens 4000] #** kwargs]
   "Generate a streaming completion using the chat completion endpoint."
   (let [stream (client.chat.completions.create
-                 :model (.pop kwargs "model" (getattr client "model" "gpt-4-turbo"))
+                 :model (.pop kwargs "model" (getattr client "model" "gpt-4o"))
                  :messages messages
                  :stream stream
                  :max-tokens max-tokens
+                 #** client._defaults
                  #** kwargs)]
     (for [chunk stream :if chunk.choices]
       (let [text (. (. (first chunk.choices) delta) content)]
-        (when text
-          (yield text))))))
+        (if text
+          (yield text)
+          (yield ""))))))
+
+(defmethod _completion [#^ TabbyClient client messages * [stream True] [max-tokens 4000] #** kwargs]
+  "Generate a streaming completion using the chat completion endpoint."
+  (let [stream (client.chat.completions.create
+                 :model (.pop kwargs "model" (getattr client "model" None))
+                 :messages messages
+                 :stream stream
+                 :max-tokens max-tokens
+                 #** client._defaults
+                 #** kwargs)]
+    (for [chunk stream :if chunk.choices]
+      (let [text (. (. (first chunk.choices) delta) content)]
+        (if text
+          (yield text)
+          (yield ""))))))
+
+(defmethod _completion [#^ Huggingface client messages * [stream True] [max-tokens 4000] #** kwargs]
+  "Generate a streaming completion using the chat completion endpoint."
+  (let [stream (client.chat.completions.create
+                 :model (.pop kwargs "model" (getattr client "model" "Qwen/Qwen2.5-72B-Instruct"))
+                 :messages messages
+                 :stream stream
+                 :max-tokens max-tokens
+                 #** client._defaults
+                 #** kwargs)]
+    (for [chunk stream :if chunk.choices]
+      (let [text (. (. (first chunk.choices) delta) content)]
+        (if text
+          (yield text)
+          (yield ""))))))
 
 (defmethod _completion [#^ Anthropic client messages * [stream True] [max-tokens 4000] #** kwargs]
   "Generate a streaming completion using the messages endpoint."
@@ -548,16 +626,22 @@ Example usage:
                        :if (not (= (:role m) "system"))
                        m)]
     (with [stream (client.messages.stream
-                    :model (.pop kwargs "model" (getattr client "model" "claude-3-opus"))
+                    :model (.pop kwargs "model" (getattr client "model" "claude-3-5-sonnet"))
                     :system system-messages
                     :messages messages
                     :max-tokens max-tokens
+                    #** client._defaults
                     #** kwargs)]
       (for [text stream.text-stream :if text]
         (yield text)))))
 
 ;; * methods requiring user authentication
 ;; ----------------------------------------------------
+
+#_(defmethod set-defaults [client #^ dict params]
+    "Set default generation parameters (e.g. temperature).
+  These can be overridden."
+    (setv client._defaults params))
 
 (defmethod models [#^ OpenAI client]
   "List all models available to OpenAI."

@@ -25,11 +25,12 @@ classifiers = [
     "Topic :: Utilities"
 ]
 dependencies = [
-    "hy==1.0.0",
-    "hyrule==0.7.0",
+    "hy",
+    "hyrule",
     "cytoolz",
     "more-itertools",
     "pansi",
+    "ansi-escapes",
     "platformdirs",
     "pygments",
     "multimethod",

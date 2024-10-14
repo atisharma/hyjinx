@@ -29,8 +29,10 @@ See individual function docstrings for detailed information.
         hyrule [flatten pformat pp :as hyrule-pp])
 
 (import os re unicodedata)
-
+(import sys [stdout])
 (import pathlib [Path])
+
+(import ansi-escapes [ansiEscapes])
 
 
 ;; * Modules
@@ -88,6 +90,13 @@ See individual function docstrings for detailed information.
 (defn tomorrow []
   "Return datetime for tomorrow."
   (days-ago -1))
+
+(defn now []
+  "Current timestamp in isoformat (as text) with timezone."
+  (-> hy.I.datetime.timezone.utc
+      (hy.I.datetime.datetime.now)
+      (.astimezone)
+      (.isoformat)))
 
 ;; * OS
 ;; ----------------------------------------------------
@@ -189,6 +198,12 @@ See individual function docstrings for detailed information.
       (when (in (.lower s) (.lower name))
         (print f"U+{i :04x} {category} {name} {char}")))))
 
+(defn is-url [url]
+  "True if a plausible url."
+  (import urllib.parse [urlparse])
+  (let [result (urlparse url)]
+    (all [result.scheme result.netloc])))
+
 ;; * Numeric
 ;; ----------------------------------------------------
 
@@ -251,6 +266,22 @@ See individual function docstrings for detailed information.
               (% (** 2 24)))]
     (get ansi.rgb (.replace f"{i :#08x}" "0x" "#"))))
 
+(defn progress [string #** kwargs]
+  "Simple multi-line progress output.
+  Splits string on newline, substitutes in kwargs with its `.format` method."
+  (let [cols (- (. (hy.I.shutil.get-terminal-size) columns) 10)
+        strings (.split string "\n")]
+    (stdout.write (ansiEscapes.cursorUp (len strings)))
+    (stdout.flush)
+    (for [s strings]
+      (stdout.write ansiEscapes.eraseLine)
+      (-> (.format s #** kwargs)
+          (.replace "\n"  "\\n")
+          (.strip)
+          (cut cols)
+          (print))
+      (stdout.flush))))
+
 ;; * Manipulations on lists and other basic data structures
 ;; ----------------------------------------------------
 
@@ -274,6 +305,12 @@ See individual function docstrings for detailed information.
     (if args
         None
         coll)))
+
+(defn group [iterable n]
+  "Collect data into chunks of length `n`."
+  ;; (group "ABCDEFG" 3) --> ABC DEF G
+  (let [iterator (iter iterable)]
+    (iter (fn [] (tuple (islice iterator n))) #())))
 
 ;; * Files
 ;; ----------------------------------------------------
@@ -306,11 +343,27 @@ See individual function docstrings for detailed information.
       (o.write content))))
 
 (defn template [fname #** kwargs]
-  "Load a string template from a file and substitute in the named kwargs."
+  "Load a string template from a file and substitute in the named kwargs
+  using python's `str.format` method."
   (-> fname
       (slurp)
       (.format #** kwargs)))
-                
+
+(defmethod blog [fname #^ str s]
+  "(Very) basic logging to a file.
+  Opens and closes the file at each write."
+  (spit fname (+ (now) " " s "\n") :mode "a"))
+  
+(defmethod blog [fname #^ Exception e]
+  "(Very) basic logging to a file.
+  Opens and closes the file at each write."
+  (spit fname (+ (now) " Error: " (repr e) "\n") :mode "a"))
+  
+(defmethod blog [fname s #^ Exception e]
+  "(Very) basic logging to a file.
+  Opens and closes the file at each write."
+  (spit fname (+ (now) f" {(str s)}; Error: " (repr e) "\n") :mode "a"))
+  
 ;; * pickling
 ;; ----------------------------------------------------
 
@@ -331,7 +384,7 @@ See individual function docstrings for detailed information.
 ;; ----------------------------------------------------
 
 (defn extract-json [text]
-  "Extract anything vaguely like { ... }."
+  "Extract anything vaguely like { ... } from a string."
   (let [result (re.search "{.*}" text re.DOTALL)]
     (if (and result (result.group))
         (try
@@ -341,7 +394,7 @@ See individual function docstrings for detailed information.
       {})))
 
 (defn jload [fname * [encoding "utf-8"]]
-  "Read a json file. None if it doesn't exist."
+  "Read a json file. Return None if it doesn't exist."
   (let [path (Path fname)]
     (when (path.exists)
       (with [f (open fname
@@ -363,7 +416,7 @@ See individual function docstrings for detailed information.
  Cobbled together from https://stackoverflow.com/a/31224105
   it overwrites the closing ']' with the new record + a new ']'.
   POSIX expects a trailing newline. Assumes utf-8."
-  (if (os.path.isfile fname)
+  (if (Path.is-file fname)
     (with [f (open fname :mode "r+" :encoding encoding)]
       (.seek f 0 os.SEEK_END)
       (.seek f (- (.tell f) 2))
@@ -379,6 +432,7 @@ See individual function docstrings for detailed information.
         [mime-type mime-subtype] (if (in "/" mime)
                                    (.split mime "/" 1)
                                    mime)
+        ;; could use Path.suffix
         extension (if (in "." fname)
                    (last (.split fname "."))
                    None)]
@@ -389,6 +443,23 @@ See individual function docstrings for detailed information.
      "type" "file"
      "source" fname}))
 
+(defn filenames [directory
+                 [ignored-dirs [".git" ".svn" ".cvs" ; vcs
+                                ".venv" "venv" "__pycache__" "dist" "build" ".*egg-info" ; python
+                                ".cache"]]]
+  "Create a generator of all files under a directory (recursively).
+  Ignore specified sub-directories."
+  (flatten
+    (gfor [dirpath subdirs filenames] (os.walk directory)
+          ;; remove the appropriate directories from the tree
+          :do (for [pattern ignored-dirs
+                    subdir (.copy subdirs)
+                    :if (re.fullmatch pattern subdir)]
+                (.remove subdirs subdir))
+          ;; for what remains, the path is returned
+          (gfor fname filenames
+                (os.path.join dirpath fname)))))
+
 ;;; Hashing, id and password functions
 ;;; -----------------------------------------------------------------------------
 
@@ -398,6 +469,6 @@ See individual function docstrings for detailed information.
       (hy.I.hashlib.sha1)
       (.hexdigest)))
 
-(defn short-id [x]
-  "First 6 chars of hash-id."
-  (cut (hash-id x) 6))
+(defn short-id [x [n 6]]
+  "First n (6) chars of hash-id."
+  (cut (hash-id x) n))

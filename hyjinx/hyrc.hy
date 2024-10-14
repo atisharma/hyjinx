@@ -84,7 +84,7 @@ Copy this somewhere and set HYSTARTUP to its location."
 
 (setv hy.repl.REPL.banner
       (fn [self]
-        (.format "🦑 Hy(+jinx) {version}(+{hjv}) using {py}({build}) {pyversion} on {os}"
+        (.format "🦑 Hy(+jinx) {version}(+{hjv}) ({hy.nickname}) using {py}({build}) {pyversion} on {os}"
                  :version hy.__version__
                  :hjv (get hyjinx.__version_info__ 2)
                  :py (platform.python_implementation)
