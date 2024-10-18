@@ -384,13 +384,23 @@ See individual function docstrings for detailed information.
 ;; ----------------------------------------------------
 
 (defn extract-json [text]
-  "Extract anything vaguely like { ... } from a string."
-  (let [result (re.search "{.*}" text re.DOTALL)]
-    (if (and result (result.group))
-        (try
-          (hy.I.json.loads (result.group))
-          (except [err [hy.I.json.JSONDecodeError]]
-            {}))
+  "Extract anything vaguely like { ... } or [ ... ] from a string."
+  (let [jobj (re.search "{.*}" text re.DOTALL)
+        jarr (re.search r"\[.*\]" text re.DOTALL)]
+    (cond
+      (and jobj (jobj.group))
+      (try
+        (hy.I.json.loads (jobj.group))
+        (except [err [hy.I.json.JSONDecodeError]]
+          {}))
+
+      (and jarr (jarr.group))
+      (try
+        (hy.I.json.loads (jarr.group))
+        (except [err [hy.I.json.JSONDecodeError]]
+          []))
+
+      :else
       {})))
 
 (defn jload [fname * [encoding "utf-8"]]
