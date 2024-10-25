@@ -25,7 +25,8 @@ See individual function docstrings for detailed information.
 (import hy [mangle])
 (import functools *
         itertools *
-        cytoolz [first second last drop partition identity]
+        dicttools *
+        toolz [first second last drop partition identity]
         hyrule [flatten pformat pp :as hyrule-pp])
 
 (import os re unicodedata)
@@ -271,8 +272,6 @@ See individual function docstrings for detailed information.
   Splits string on newline, substitutes in kwargs with its `.format` method."
   (let [cols (- (. (hy.I.shutil.get-terminal-size) columns) 10)
         strings (.split string "\n")]
-    (stdout.write (ansiEscapes.cursorUp (len strings)))
-    (stdout.flush)
     (for [s strings]
       (stdout.write ansiEscapes.eraseLine)
       (-> (.format s #** kwargs)
@@ -280,7 +279,9 @@ See individual function docstrings for detailed information.
           (.strip)
           (cut cols)
           (print))
-      (stdout.flush))))
+      (stdout.flush))
+    (stdout.write (ansiEscapes.cursorUp (len strings)))
+    (stdout.flush)))
 
 ;; * Manipulations on lists and other basic data structures
 ;; ----------------------------------------------------

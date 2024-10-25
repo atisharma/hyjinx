@@ -27,7 +27,7 @@ classifiers = [
 dependencies = [
     "hy",
     "hyrule",
-    "cytoolz",
+    "toolz",
     "more-itertools",
     "pansi",
     "ansi-escapes",

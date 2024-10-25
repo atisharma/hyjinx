@@ -14,7 +14,7 @@ Copy this somewhere and set HYSTARTUP to its location."
 (import hyrule [pformat])
 (import functools [partial])
 (import importlib [reload])
-(import pydoc [pager])
+(import pydoc [pager apropos])
 
 (import hyjinx)
 
