@@ -20,13 +20,13 @@ See individual function docstrings for detailed information.
 (require hyrule [unless -> ->> as->]
          hyjinx.macros *)
 
-(require hyjinx.macros [rest lmap])
+(require hyjinx.macros [lmap])
 
 (import hy [mangle])
 (import functools *
         itertools *
-        dicttools *
-        toolz [first second last drop partition identity]
+        toolz.itertoolz [rest]
+        toolz [take first second last drop partition identity]
         hyrule [flatten pformat pp :as hyrule-pp])
 
 (import os re unicodedata)
@@ -291,11 +291,6 @@ See individual function docstrings for detailed information.
 
 (defn shift [l]
   (.pop l 0))
-
-(defn take [n it]
-  "Return first n items of iterable as a list."
-  ;; see more-itertools
-  (list (islice it n)))
 
 (defn get-in [coll #* args]
   "A recursive get that returns None in case of missing keys."

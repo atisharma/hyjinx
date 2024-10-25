@@ -1,8 +1,9 @@
-"Browse the official Hy / Hyrule docs (with syntax highlighting)."
+"Browse the official hy, hyrule and toolz docs (with syntax highlighting)."
 
 (require hyrule [defmain])
 
-(import hy hyrule)
+(import hy hyrule toolz)
+(import toolz.itertoolz [rest])
 (import os
         tarfile
         shutil
@@ -35,32 +36,47 @@
     (os.remove tarball)))
 
 (defn install []
-  "Download a local copy of the Hy and Hyrule documentation."
+  "Download a local copy of the Hy, Hyrule and toolz documentation."
   (_install-docs f"https://github.com/hylang/hy/archive/refs/tags/{hy.__version__}.tar.gz" f"hy_{hy.__version__}")
-  (_install-docs f"https://github.com/hylang/hyrule/archive/refs/tags/{hyrule.__version__}.tar.gz" f"hyrule_{hyrule.__version__}"))
+  (_install-docs f"https://github.com/hylang/hyrule/archive/refs/tags/{hyrule.__version__}.tar.gz" f"hyrule_{hyrule.__version__}")
+  (_install-docs f"https://github.com/pytoolz/toolz/archive/refs/tags/{toolz.__version__}.tar.gz" f"toolz_{toolz.__version__}"))
 
 (defn _show-doc [[page "index"] * package [use-pager True] [bg "dark"]]
-  "Show a package's documentation. For example, (hy-doc \"whyhy\") or (hy-doc \"NEWS\")."
+  "Show a package's documentation."
   (try
     (let [formatter (TerminalFormatter :bg bg :stripall True)
           term (shutil.get-terminal-size)
           cachedir (user-cache-dir __package__ __name__)
-          fname f"{cachedir}/docs/{package}/{page}.rst"
+          fname f"{cachedir}/docs/{package}/{(str page)}.rst"
           text (highlight (slurp fname) (RstLexer) formatter)]
       (if use-pager
           (pager text)
           (print text)))
     (except [FileNotFoundError]
-      (raise (FileNotFoundError f"Could not find '{page}' - did you correctly type the page name and install the documentation with (hyjinx.docs.install)?")))))
+      (raise (FileNotFoundError f"Could not find '{(str page)}' - did you correctly type the page name and install the documentation with (hyjinx.docs.install)?")))))
 
-(defn hyrule-doc [#* args #** kwargs]
+(defn doc-hy [#* args #** kwargs]
+  "Show hy's documentation. For example, (doc-hy \"whyhy\") or (doc-hy \"NEWS\")."
+  (_show-doc #* args #** kwargs :package f"hy_{hy.__version__}"))
+
+(defn doc-hyrule [#* args #** kwargs]
   "Show hyrule's docs."
   (_show-doc #* args #** kwargs :package f"hyrule_{hyrule.__version__}"))
 
-(defn hy-doc [#* args #** kwargs]
-  "Show Hy's documentation. For example, (hy-doc \"whyhy\") or (hy-doc \"NEWS\")."
-  (_show-doc #* args #** kwargs :package f"hy_{hy.__version__}"))
+(defn doc-toolz [#* args #** kwargs]
+  "Show toolz's documentation. For example, (doc-toolz \"curry\")."
+  (_show-doc #* args #** kwargs :package f"toolz_{toolz.__version__}"))
 
-(defmain []
-  "If running from the command line, install the docs."
-  (install))
+(defn doc [package #* args #** kwargs]
+  "Show documentation page for hy, hyrule or toolz."
+  (match (str package)
+    "hy" (doc-hy #* args #** kwargs)
+    "hyrule" (doc-hyrule #* args #** kwargs)
+    "toolz" (doc-toolz #* args #** kwargs)
+    _ (raise (FileNotFoundError f"Could not find docs for '{(str package)}' - did you install the documentation with (hyjinx.docs.install)?"))))
+
+(defmain [args]
+  "If running from the command line, either install the docs, or show the help."
+  (if args
+    (doc #* (rest args))
+    (install)))

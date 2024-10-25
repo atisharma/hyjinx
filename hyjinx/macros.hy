@@ -48,6 +48,7 @@ Macros for Flow Control
 
 (defmacro rest [xs]
   "A slice of all but the first element of a sequence."
+  ;; consider toolz.itertoolz.rest
   `(cut ~xs 1 None))
   
 (defmacro butlast [xs]

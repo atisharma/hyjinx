@@ -41,7 +41,7 @@ Copy this somewhere and set HYSTARTUP to its location."
                 take chain repeat reduce
                 first second last identity
                 jload jsave
-                hy-doc hyrule-doc])
+                doc doc-hy doc-hyrule doc-toolz])
 
 ;; * numpy-related things
 ;; ----------------------------------------------------
