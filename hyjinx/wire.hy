@@ -14,11 +14,13 @@
 
 (setv HYJINX_PROTOCOL_VERSION "0.0.3")
 
-(setv keys (crypto.keys (config "passphrase"))
-      priv-key (:private keys)
-      pub-key (:public-pem keys))
+(defn keys [config-file]
+  "Return dict with public and private keys."
+  (let [keys (crypto.keys (:passphrase config config-file))]
+    {"priv-key" (:private keys)
+     "pub-key" (:public-pem keys)}))
 
-(defn wrap [payload]
+(defn wrap [payload * pub-key priv-key]
   "Format and wrap message."
   (let [t (time)
         payload-hash (hash-id (+ (str t) (str payload)))]
