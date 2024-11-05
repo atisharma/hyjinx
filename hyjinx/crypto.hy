@@ -4,6 +4,7 @@ ECDSA public-private key signing and verification.
 
 (require hyrule.argmove [-> ->>])
 
+(import time [time])
 (import hashlib [sha1 pbkdf2-hmac sha256])
 (import hmac [compare-digest])
 (import base64 [b64encode b64decode])
@@ -62,3 +63,13 @@ ECDSA public-private key signing and verification.
     (try
       (.verify pub-key bsig bmsg sha256 :sigdecode sigdecode-der)  
       (except [BadSignatureError]))))
+
+(defn is-recent [client-time [threshold 120]]
+  "Is client's message time within threshold (seconds) of server time?
+  Used in message verification to avoid stale messages."
+  (try
+    (let [diff (abs (- (float client-time)
+                       (time)))]
+      (< diff threshold))
+    (except [ValueError])))
+

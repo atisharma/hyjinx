@@ -379,6 +379,7 @@ See individual function docstrings for detailed information.
 ;; * JSON
 ;; ----------------------------------------------------
 
+;; TODO json-repair seems better; try it out
 (defn extract-json [text]
   "Extract anything vaguely like { ... } or [ ... ] from a string."
   (let [jobj (re.search "{.*}" text re.DOTALL)
@@ -452,7 +453,7 @@ See individual function docstrings for detailed information.
 (defn filenames [directory
                  [ignored-dirs [".git" ".svn" ".cvs" ; vcs
                                 ".venv" "venv" "__pycache__" "dist" "build" ".*egg-info" ; python
-                                ".cache"]]]
+                                ".cache" ".zk"]]]
   "Create a generator of all files under a directory (recursively).
   Ignore specified sub-directories."
   (flatten

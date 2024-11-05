@@ -21,11 +21,12 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Lisp",
+    "Programming Language :: Hy",
     "Topic :: Software Development :: Libraries",
     "Topic :: Utilities"
 ]
 dependencies = [
-    "hy",
+    #"hy",
     "hyrule",
     "toolz",
     "more-itertools",
@@ -34,13 +35,14 @@ dependencies = [
     "platformdirs",
     "pygments",
     "multimethod",
-    "python-magic"
+    "python-magic",
+    "json-repair"
 ]
 
 [project.optional-dependencies]
-zmq = ["ecdsa", "pyzmq", "zstandard"]
+zmq = ["ecdsa", "pyzmq", "zstandard", "msgpack"]
 llm = ["openai", "anthropic"]
-dev = ["pytest", "ecdsa", "pyzmq", "zstandard", "openai", "anthropic"]
+dev = ["pytest", "ecdsa", "pyzmq", "zstandard", "msgpack", "openai", "anthropic"]
 
 [project.urls]
 Repository = "https://github.com/atisharma/hyjinx"
