@@ -11,9 +11,9 @@ Compatible with Hy 0.29.0.
 - An `inspect` module that works like Python's, but also for Hy code
 - Pretty tracebacks with correct syntax highlighting for hy or python
 - Print/get/edit source code of a function, module etc. (e.g. `(print-source hyjinx.lib.sieve)`
+- A sensible, lispy `defmethod`
 - In-repl code analysis and discussion using LLMs (e.g. for writing docstrings)
 - In-repl syntax highlighting and latex rendering (for [sixel-capable terminals](https://www.arewesixelyet.com)) for LLM replies
-- A sensible, lispy `defmethod`
 - Numpy array pretty printing
 - A zmq lazy pirate protocol
 - A minimal ncurses class
@@ -25,11 +25,12 @@ Compatible with Hy 0.29.0.
 - hyjinx.source: live code inspection.
 - hyjinx.inspect: code inspection.
 - hyjinx.doc: peruse hy documentation.
+- hyjinx.sources: url, youtube, arxiv, wikipedia to markdown.
 - hyjinx.screen: a convenient ncurses wrapper.
 
 - hyjinx.mat: numpy pretty-printing for humans. (requires numpy, jax optional)
 
-- hyjinx.[zmq_client, zmq_server, crypto, wire]: lazy-pirate zmq RPC architecture. (requires zmq, ecdsa, zstandard)
+- hyjinx.[zmq_client, zmq_server, crypto, wire]: lazy-pirate zmq RPC architecture. (requires zmq, ecdsa, zstandard, msgpack)
 
 - hyjinx.llm: discuss code with a Large Language Model (AI). TabbyAPI, OpenAI-compatible and Claude are supported. (requires `openai` and `anthropic` packages.)
 
@@ -67,3 +68,5 @@ For in-terminal sixel rendering of latex in LLM replies, make sure pdflatex, dvi
 You can install with the `[zmq]` option which also installs ecdsa, [pyzmq](https://pypi.org/project/pyzmq/) and [zstandard](https://pypi.org/project/zstandard/) for the zmq server/client
 
 You can install with the `[llm]` option which also installs openai and lets you discuss code objects with ChatGPT or a locally-served LLM (via TabbyAPI or similar).
+
+You can install with the `[web]` option which installs the packages required to fetch web text.
