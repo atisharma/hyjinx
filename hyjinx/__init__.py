@@ -19,7 +19,7 @@ hyjinx.mat - numpy pretty-printing for humans.
 hyjinx.[zmq_client, zmq_server, crypto, wire] - lazy-pirate zmq RPC architecture.
 
 (depends on openai and/or anthropic)
-hyjinx.llm - discuss code with a Large Language Model (AI). TabbyAPI and OpenAI-compatible are supported.
+hyjinx.llm - discuss code with a Large Language Model (AI). Anthropic, TabbyAPI and OpenAI-compatible APIs are supported.
 
 """
 
@@ -42,7 +42,7 @@ hy.macros.require('hyjinx.macros', None, assignments = 'ALL', prefix = '')
 
 # set the package version
 # the major.minor version simply match the assumed Hy version
-__version__ = "1.0.5"
+__version__ = "1.0.6"
 __version_info__ = __version__.split(".")
 
 

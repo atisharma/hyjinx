@@ -42,7 +42,6 @@ dependencies = [
 [project.optional-dependencies]
 zmq = ["ecdsa", "pyzmq", "zstandard", "msgpack"]
 llm = ["openai", "anthropic"]
-web = ["httpx", "arxiv", "wikipedia", "markdownify", "youtube-transcript-api", "lxml", "lxml_html_clean"]
 dev = ["pytest", "ecdsa", "pyzmq", "zstandard", "msgpack", "openai", "anthropic"]
 
 [project.urls]

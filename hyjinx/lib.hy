@@ -29,6 +29,7 @@ See individual function docstrings for detailed information.
         toolz [take first second last drop partition identity]
         hyrule [flatten pformat pp :as hyrule-pp])
 
+(import asyncio)
 (import os re unicodedata)
 (import sys [stdout])
 (import pathlib [Path])
@@ -42,6 +43,31 @@ See individual function docstrings for detailed information.
 (defn mreload [#* modules]
   "Reload a list of modules in order."
   (lmap hy.I.importlib.reload modules))
+
+
+;; * async and coroutines
+;; ----------------------------------------------------
+
+(defn sync-await [coroutine]
+  "Call a coroutine from inside a synchronous function,
+  itself called from inside the async event loop.
+  See also `asyncio.to-thread`."
+  (import asyncio)
+  (asyncio.run-coroutine-threadsafe
+    coroutine
+    (asyncio.get-event-loop)))
+
+;; FIXME doesn't work
+(defn :async coroutine [f [process False] #* args #** kwargs]
+  "Decorator to run a synchronous function in an executor.
+  Defaults to `ThreadPoolExecutor`, more suitable for IO-bound tasks,
+  otherwise when `process` is `True`, uses `ProcessPoolExecutor`, for CPU-bound tasks.
+  Remember that the GIL exists."
+  (import asyncio [get-event-loop])
+  (import concurrent.futures [ProcessPoolExecutor ThreadPoolExecutor])
+  (with [executor (if process (ProcessPoolExecutor) (ThreadPoolExecutor))]
+    (await (.run-in-executor (get-event-loop) executor f #* args #** kwargs)))) 
+
 
 ;; * Functions
 ;; ----------------------------------------------------
@@ -69,6 +95,7 @@ See individual function docstrings for detailed information.
     (fn [f g]
       (fn [#* args #** kwargs] (f (g #* args #** kwargs))))
     funcs))
+
 
 ;; * Time and date
 ;; ----------------------------------------------------
@@ -98,6 +125,7 @@ See individual function docstrings for detailed information.
       (hy.I.datetime.datetime.now)
       (.astimezone)
       (.isoformat)))
+
 
 ;; * OS
 ;; ----------------------------------------------------
@@ -153,6 +181,7 @@ See individual function docstrings for detailed information.
   "The user's username, on unix or Windows."
   (os.environ.get "USER" (os.environ.get "USERNAME")))
 
+
 ;; * Strings
 ;; ----------------------------------------------------
 
@@ -205,6 +234,7 @@ See individual function docstrings for detailed information.
   (let [result (urlparse url)]
     (all [result.scheme result.netloc])))
 
+
 ;; * Numeric
 ;; ----------------------------------------------------
 
@@ -247,6 +277,7 @@ See individual function docstrings for detailed information.
   "The product of the elements in l."
   (reduce hy.I.operator.mul l))
 
+
 ;; * Output
 ;; ----------------------------------------------------
 
@@ -283,6 +314,7 @@ See individual function docstrings for detailed information.
     (stdout.write (ansiEscapes.cursorUp (len strings)))
     (stdout.flush)))
 
+
 ;; * Manipulations on lists and other basic data structures
 ;; ----------------------------------------------------
 
@@ -307,6 +339,7 @@ See individual function docstrings for detailed information.
   ;; (group "ABCDEFG" 3) --> ABC DEF G
   (let [iterator (iter iterable)]
     (iter (fn [] (tuple (islice iterator n))) #())))
+
 
 ;; * Files
 ;; ----------------------------------------------------
@@ -360,6 +393,7 @@ See individual function docstrings for detailed information.
   Opens and closes the file at each write."
   (spit fname (+ (now) f" {(str s)}; Error: " (repr e) "\n") :mode "a"))
   
+
 ;; * pickling
 ;; ----------------------------------------------------
 
@@ -375,6 +409,7 @@ See individual function docstrings for detailed information.
   Defaults to the highest available protocol."
   (with [f (open fname :mode "wb")]
     (hy.I.pickle.dump obj f :protocol protocol)))
+
 
 ;; * JSON
 ;; ----------------------------------------------------
@@ -467,8 +502,9 @@ See individual function docstrings for detailed information.
           (gfor fname filenames
                 (os.path.join dirpath fname)))))
 
-;;; Hashing, id and password functions
-;;; -----------------------------------------------------------------------------
+
+;; * Hashing, id and password functions
+;; -----------------------------------------------------------------------------
 
 (defn hash-id [s]
   "Hex digest of sha1 hash of string."

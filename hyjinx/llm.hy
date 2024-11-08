@@ -10,6 +10,7 @@ providing explanations, performing code review, and rewriting code. It
 includes a Hy implementation of a TabbyClient to interact with
 TabbyAPI for model management and streaming completions. It also
 supports various LLM providers such as OpenAI and Anthropic.
+The HuggingFace provider has not yet been tested.
 
 Features:
 - converse: Chat over a list of messages, updating the message list in-place.
@@ -106,6 +107,8 @@ Example usage:
   (except [ModuleNotFoundError]
     (defclass _Huggingface)))
 
+
+;; TODO embedding API calls
 
 (defclass TabbyClientError [RuntimeError])
 (defclass ChatError [RuntimeError])
