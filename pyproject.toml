@@ -30,7 +30,7 @@ dependencies = [
     "hyrule",
     "toolz",
     "more-itertools",
-    "pansi",
+    "pansi==2020.7.3",
     "ansi-escapes",
     "platformdirs",
     "pygments",
