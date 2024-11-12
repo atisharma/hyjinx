@@ -30,6 +30,9 @@ Macros for Flow Control
 
 "
 
+(import toolz [first second])
+
+
 ;; * macros about macros
 ;; ----------------------------------------------------
 
@@ -43,6 +46,7 @@ Macros for Flow Control
   Use like (help-macro 'help-macro)."
   `(help (get-macro ~macro)))
   
+
 ;; * macros for sequences
 ;; ----------------------------------------------------
 
@@ -71,10 +75,11 @@ Macros for Flow Control
   "Eager map, realised as a list."
   `(list (map ~@args)))
 
+
 ;; * macros for functions
 ;; ----------------------------------------------------
 
-(defmacro defmethod [f #* body]
+(defmacro defmethod [#* args]
   "Define a multimethod (using multimethod.multimethod).
   For example, the Hy code
 
@@ -85,10 +90,24 @@ Macros for Flow Control
 
   `@multimethod
   def f(x: int, y: float):
-      return(x // int(y))`
+      return await x // int(y)`
+
+  You can also define an asynchronous multimethod:
+
+  `(defmethod :async f [#* args #** kwargs]
+    (await some-async-function #* args #** kwargs))`
   "
-  `(defn [hy.I.multimethod.multimethod] ~f
-     ~@body))
+  (if (= :async (first args))
+
+    (let [f (second args)
+          body (cut args 2 None)]
+      `(defn :async [hy.I.multimethod.multimethod] ~f
+         ~@body))
+
+    (let [f (first args)
+          body (cut args 1 None)]
+      `(defn [hy.I.multimethod.multimethod] ~f
+         ~@body))))
 
 (defmacro defproperty [f #* body]
   "Class method definition using the property decorator.
@@ -103,6 +122,7 @@ Macros for Flow Control
   "
   `(defn [property] ~f [self] ~@body))
   
+
 ;; * macros for pytest
 ;; ----------------------------------------------------
 
@@ -128,6 +148,7 @@ Macros for Flow Control
   `(defn ~test-name [~x]
      (assert (hy.I.numpy.isclose (~f ~x) ~ans)))) 
 
+
 ;; * macros for data structures
 ;; ----------------------------------------------------
 
@@ -146,6 +167,7 @@ Macros for Flow Control
   "
   `(defclass [hy.I.dataclass.dataclass] ~d []
      ~@body))
+
 
 ;; * macros for flow control
 ;; ----------------------------------------------------

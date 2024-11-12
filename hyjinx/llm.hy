@@ -107,6 +107,16 @@ Example usage:
   (except [ModuleNotFoundError]
     (defclass _Huggingface)))
 
+(try
+  (import openai [AsyncOpenAI :as _AsyncOpenAI])
+  (except [ModuleNotFoundError]
+    (defclass _AsyncOpenAI)))
+
+(try
+  (import anthropic [AsyncAnthropic :as _AsyncAnthropic])
+  (except [ModuleNotFoundError]
+    (defclass _AsyncAnthropic)))
+
 
 ;; TODO embedding API calls
 
@@ -117,10 +127,15 @@ Example usage:
 ;; -----------------------------------------------------------------------------
 
 (setv HasCodeType (| type ModuleType FunctionType MethodType TracebackType))
-(setv ClientType (| _OpenAI _Anthropic))
+(setv OpenAIClientType (| _OpenAI _AsyncOpenAI))
+(setv AnthropicClientType (| _OpenAI _AsyncOpenAI))
+(setv SyncClientType (| _OpenAI _Anthropic))
+(setv AsyncClientType (| _AsyncOpenAI _AsyncAnthropic))
+(setv ClientType (| _OpenAI _Anthropic AsyncClientType))
 (setv ContentType (| str (of list dict)))
 
-;; * Extend standard API clients
+
+;; * Extend standard synchronous API clients
 ;; ----------------------------------------------------
 
 (defclass OpenAI [_OpenAI]
@@ -146,6 +161,23 @@ Example usage:
     "Initialise as for Huggingface, but optionally pass default generation parameters."
     (setv self._defaults (.pop kwargs "params" {}))
     (.__init__ (super) #** kwargs)))
+
+(defclass AsyncOpenAI [_AsyncOpenAI]
+  "Extend OpenAI class to carry default generation parameters."
+
+  (defn __init__ [self #** kwargs]
+    "Initialise as for OpenAI, but optionally pass default generation parameters."
+    (setv self._defaults (.pop kwargs "params" {}))
+    (.__init__ (super) #** kwargs)))
+
+(defclass AsyncAnthropic [_AsyncAnthropic]
+  "Extend Anthropic class to carry default generation parameters."
+
+  (defn __init__ [self #** kwargs]
+    "Initialise as for Anthropic, but optionally pass default generation parameters."
+    (setv self._defaults (.pop kwargs "params" {}))
+    (.__init__ (super) #** kwargs)))
+
 
 ;; * the actually useful functions 
 ;; -----------------------------------------------------------------------------
@@ -311,10 +343,11 @@ Example usage:
 
 (definstruct example "Give a minimal and correct example usage for the following code.")
 
+
 ;; * message convenience functions
 ;; -----------------------------------------------------------------------------
 
-(defmethod image-content [#^ OpenAI client #^ str text #^ str image-path]
+(defmethod image-content [#^ OpenAIClientType client #^ str text #^ str image-path]
   "Create a message for OpenAI-compatible API with text and image content."
   (if image-path
     [{"type" "text" "text" text}
@@ -323,7 +356,7 @@ Example usage:
                             (b64-encode-image image-path))}}]
     text))
 
-(defmethod image-content [#^ Anthropic client #^ str text #^ str image-path]
+(defmethod image-content [#^ AnthropicClientType client #^ str text #^ str image-path]
   "Create a message for Anthropic API with text and image content.
   Currently, Claude supports image/jpeg, image/png, image/gif, image/webp."
   ;; TODO: list of multiple images
@@ -351,6 +384,7 @@ Example usage:
 
 (defn _assistant [#^ ContentType content]
   (_msg "assistant" content))
+
 
 ;; * output handling
 ;; -----------------------------------------------------------------------------
@@ -522,7 +556,8 @@ Example usage:
       (subprocess.run ["img2sixel" png] :capture-output False :timeout timeout)
       (print "\n" :flush True))))
 
-;; * the Tabby API client
+
+;; * the synchronous and asynchronous Tabby API client
 ;; ----------------------------------------------------
 
 (defclass TabbyClient [OpenAI]
@@ -571,7 +606,59 @@ Example usage:
               response))
           (raise (TabbyClientError f"{ansi.red}{response.status-code}\n{(pformat (:detail (response.json)) :indent 2)}{ansi.reset}"))))))
 
-;; * generation methods requiring user authentication
+
+(defclass AsyncTabbyClient [AsyncOpenAI]
+  "A REPL-facing client for TabbyAPI (https://github.com/theroyallab/tabbyAPI).
+
+  The `AsyncTabbyClient` class provides an asynchronous client to interact with
+  TabbyAPI for model management and streaming completions. It provides methods
+  to load, unload, and manage models, as well as other useful features such as
+  streaming completions and handling templates and LoRAs. An admin key is
+  required for some endpoints.
+
+  Methods are defined at the module level."
+
+  (defn __init__ [self #** kwargs]
+    "The base-url should have the 'v1' at the end.
+     Initialise as for OpenAI, but optionally pass admin_key as well."
+    (setv self.model None)
+    (setv self._admin_key (.pop kwargs "admin_key" None))
+    (.__init__ (super) #** kwargs))
+
+  (defn _get [self endpoint * [admin False] [timeout 20]]
+    "GET an authenticated endpoint or raise error."
+    (let [auth (if admin
+                   {"x-api-key" self._admin-key}
+                   {"x-api-key" self.api-key})
+          response (httpx.get (.join self.base-url endpoint)
+                              :headers auth
+                              :timeout timeout)]
+      (if response.is-success
+          (response.json)
+          (raise (TabbyClientError f"{ansi.red}{response.status-code}\n{(pformat (:detail (response.json)) :indent 2)}{ansi.reset}")))))
+
+  (defn _post [self endpoint * [admin False] [timeout 20] #** data]
+    "POST to an authenticated endpoint or raise error."
+    (let [auth (if admin
+                   {"x-admin-key" self._admin-key}
+                   {"x-api-key" self.api-key})
+          response (httpx.post (.join self.base-url endpoint)
+                               :headers auth
+                               :json (or data {})
+                               :timeout timeout)]
+      (if response.is-success
+          (try
+            (.json response)
+            (except [e [JSONDecodeError TypeError]]
+              response))
+          (raise (TabbyClientError f"{ansi.red}{response.status-code}\n{(pformat (:detail (response.json)) :indent 2)}{ansi.reset}"))))))
+
+
+;; has to be defined after classes
+(setv TabbyClientType (| TabbyClient AsyncTabbyClient))
+
+
+;; * synchronous and asynchronous generation methods requiring user authentication
 ;; ----------------------------------------------------
 
 (defmethod _completion [#^ OpenAI client messages * [stream True] [max-tokens 4000] #** kwargs]
@@ -638,6 +725,56 @@ Example usage:
       (for [text stream.text-stream :if text]
         (yield text)))))
 
+(defmethod :async _completion [#^ AsyncOpenAI client messages * [stream True] [max-tokens 4000] #** kwargs]
+  "Generate a streaming completion using the chat completion endpoint."
+  (let [stream (await (client.chat.completions.create
+                        :model (.pop kwargs "model" (getattr client "model" "gpt-4o"))
+                        :messages messages
+                        :stream stream
+                        :max-tokens max-tokens
+                        #** client._defaults
+                        #** kwargs))]
+    (for [chunk stream :if chunk.choices]
+      (let [text (. (. (first chunk.choices) delta) content)]
+        (if text
+          (yield text)
+          (yield ""))))))
+
+(defmethod :async _completion [#^ AsyncTabbyClient client messages * [stream True] [max-tokens 4000] #** kwargs]
+  "Generate a streaming completion using the chat completion endpoint."
+  (let [stream (await (client.chat.completions.create
+                        :model (.pop kwargs "model" (getattr client "model" None))
+                        :messages messages
+                        :stream stream
+                        :max-tokens max-tokens
+                        #** client._defaults
+                        #** kwargs))]
+    (for [chunk stream :if chunk.choices]
+      (let [text (. (. (first chunk.choices) delta) content)]
+        (if text
+          (yield text)
+          (yield ""))))))
+
+(defmethod :async _completion [#^ AsyncAnthropic client messages * [stream True] [max-tokens 4000] #** kwargs]
+  "Generate a streaming completion using the messages endpoint."
+  (let [system-messages (.join "\n"
+                               (lfor m messages
+                                     :if (= (:role m) "system")
+                                     (:content m)))
+        messages (lfor m messages
+                       :if (not (= (:role m) "system"))
+                       m)]
+    (with [stream (await (client.messages.stream
+                           :model (.pop kwargs "model" (getattr client "model" "claude-3-5-sonnet"))
+                           :system system-messages
+                           :messages messages
+                           :max-tokens max-tokens
+                           #** client._defaults
+                           #** kwargs))]
+      (for [text stream.text-stream :if text]
+        (yield text)))))
+
+
 ;; * methods requiring user authentication
 ;; ----------------------------------------------------
 
@@ -646,55 +783,56 @@ Example usage:
   These can be overridden."
     (setv client._defaults params))
 
-(defmethod models [#^ OpenAI client]
+(defmethod models [#^ OpenAIClientType client]
   "List all models available to OpenAI."
   (let [models (client.models.list)]
     (lfor m models m.id)))
 
-(defmethod models [#^ TabbyClient client]
+(defmethod models [#^ TabbyClientType client]
   "List all models available to TabbyAPI."
   (let [l (:data (client._get "models" :admin True))]
     (sorted (lfor m l (:id m)))))
 
-(defmethod draft-models [#^ TabbyClient client]
+(defmethod draft-models [#^ TabbyClientType client]
   "List all draft models available to TabbyAPI."
   (let [l (:data (client._get "model/draft/list" :admin True))]
     (sorted (lfor m l (:id m)))))
 
-(defmethod loras [#^ TabbyClient client]
+(defmethod loras [#^ TabbyClientType client]
   "List all loras available to TabbyAPI."
   (let [loras (:data (client._get "loras"))]
     (sorted (lfor l loras {"name" (:id l) #** l})
             :key :name)))
 
-(defmethod model [#^ OpenAI client]
+(defmethod model [#^ OpenAIClientType client]
   "Get the currently selected model."
   {"id" client.model})
 
-(defmethod model [#^ TabbyClient client]
+(defmethod model [#^ TabbyClientType client]
   "Get the currently loaded model."
   (let [response (client._get "model")]
     (setv client.model (:id response))
     response))
     
-(defmethod lora [#^ TabbyClient client]
+(defmethod lora [#^ TabbyClientType client]
   "Get the currently loaded loras."
   (client._get "lora"))
 
-(defmethod templates [#^ TabbyClient client]
+(defmethod templates [#^ TabbyClientType client]
   "List all templates available to TabbyAPI."
   (sorted (:data (client._get "templates" :admin True))))
+
 
 ;; * methods requiring admin authentication
 ;; ----------------------------------------------------
 
-(defmethod template-switch [#^ TabbyClient client #^ str template]
+(defmethod template-switch [#^ TabbyClientType client #^ str template]
   "Set the currently loaded template."
   (client._post "template/switch"
                 :admin True
                 :name template))
 
-(defmethod template-unload [#^ TabbyClient client]
+(defmethod template-unload [#^ TabbyClientType client]
   "Unload the currently loaded template."
   (client._post "template/unload"
                 :admin True))
@@ -705,7 +843,7 @@ Example usage:
   This just sets a default."
   (setv client.model model))
 
-(defmethod model-load [#^ TabbyClient client #^ str model #** kwargs]
+(defmethod model-load [#^ TabbyClientType client #^ str model #** kwargs]
   "Load a model.
   TabbyAPI needs to load/unload models before use.
   kwargs are passed to the API.
@@ -720,14 +858,14 @@ Example usage:
     (setv client.model model)
     (print f"{model} loaded.")))
 
-(defmethod model-unload [#^ TabbyClient client]
+(defmethod model-unload [#^ TabbyClientType client]
   "Unload a model.
    TabbyAPI needs to load/unload models before use."
   (client._post "model/unload"
                 :admin True)
   (setv client.model None))
 
-(defmethod lora-load [#^ TabbyClient client #^ list loras]
+(defmethod lora-load [#^ TabbyClientType client #^ list loras]
   "Load LoRAs when using TabbyAPI.
   loras is a list of dicts, with 'name', 'scaling' as keys."
   (client._post "lora/load"
@@ -735,39 +873,40 @@ Example usage:
                 :loras loras
                 :timeout None))
     
-(defmethod lora-load [#^ TabbyClient client #^ str lora * [scaling 1.0]]
+(defmethod lora-load [#^ TabbyClientType client #^ str lora * [scaling 1.0]]
   "Load a single LoRA when using TabbyAPI.
   lora is the name of the lora. Scaling defaults to 1.0."
   (lora-load client [{"name" lora "scaling" scaling}]))
 
-(defmethod lora-unload [#^ TabbyClient client]
+(defmethod lora-unload [#^ TabbyClientType client]
   "Unload LoRAs when using TabbyAPI."
   (client._post "lora/unload"
                 :admin True))
 
-(defmethod sampling-overrides [#^ TabbyClient client]
+(defmethod sampling-overrides [#^ TabbyClientType client]
   "List all currently applied sampler overrides."
   (client._get "sampling/overrides" :admin True))
 
-(defmethod sampling-override-switch [#^ TabbyClient client #** schema]
+(defmethod sampling-override-switch [#^ TabbyClientType client #** schema]
   "Switch the currently loaded override preset."
   (client._post "sampling/override/switch" :admin True #** schema))
 
-(defmethod sampling-override-unload [#^ TabbyClient client]
+(defmethod sampling-override-unload [#^ TabbyClientType client]
   "Unload the currently loaded override preset."
   (client._post "sampling/override/unload" :admin True))
 
-(defmethod encode [#^ TabbyClient client #^ str text #** kwargs]
+(defmethod encode [#^ TabbyClientType client #^ str text #** kwargs]
   "Encode a string into tokens.
   kwargs are passed to the API.
   See the API docs for options determining handling of special tokens."
   (client._post "token/encode" :text text #** kwargs))
 
-(defmethod decode [#^ TabbyClient client #^ (of list int) tokens #** kwargs]
+(defmethod decode [#^ TabbyClientType client #^ (of list int) tokens #** kwargs]
   "Encode a string into tokens.
   kwargs are passed to the API.
   See the API docs for options determining handling of special tokens."
   (client._post "token/decode" :tokens tokens #** kwargs))
+
 
 ;; * helper functions
 ;; ------------------
