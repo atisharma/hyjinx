@@ -458,7 +458,7 @@ See individual function docstrings for detailed information.
  Cobbled together from https://stackoverflow.com/a/31224105
   it overwrites the closing ']' with the new record + a new ']'.
   POSIX expects a trailing newline. Assumes utf-8."
-  (if (Path.is-file fname)
+  (if (Path.is-file (Path fname))
     (with [f (open fname :mode "r+" :encoding encoding)]
       (.seek f 0 os.SEEK_END)
       (.seek f (- (.tell f) 2))
