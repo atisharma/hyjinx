@@ -234,6 +234,13 @@ See individual function docstrings for detailed information.
   (let [result (urlparse url)]
     (all [result.scheme result.netloc])))
 
+(defmethod defence [#^ str s]
+  "Remove markdown code fences."
+  (.join "\n"
+    (lfor l (.split s "\n")
+      :if (not (.startswith (.strip l) "```"))
+      l)))
+ 
 
 ;; * Numeric
 ;; ----------------------------------------------------
@@ -465,6 +472,13 @@ See individual function docstrings for detailed information.
       (.write f (.format ",\n{}]\n" (hy.I.json.dumps record :indent 4))))
     (with [f (open fname :mode "w" :encoding encoding)]
       (.write f (.format "[\n{}]\n" (hy.I.json.dumps record :indent 4))))))
+
+(defn jsonl-append [fname obj * [encoding "utf-8"]]
+  "Append the json object as one line of jsonl."
+  (with [f (open fname
+                 :mode "q"
+                 :encoding encoding)]
+    (f.write (+ (json.dumps obj) "\n"))))
 
 (defn filetype [fname]
   "Guess the file type from various cues.
