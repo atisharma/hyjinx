@@ -128,7 +128,7 @@ Example usage:
 
 (setv HasCodeType (| type ModuleType FunctionType MethodType TracebackType))
 (setv OpenAIClientType (| _OpenAI _AsyncOpenAI))
-(setv AnthropicClientType (| _OpenAI _AsyncOpenAI))
+(setv AnthropicClientType (| _Anthropic _AsyncAnthropic))
 (setv SyncClientType (| _OpenAI _Anthropic))
 (setv AsyncClientType (| _AsyncOpenAI _AsyncAnthropic))
 (setv ClientType (| _OpenAI _Anthropic AsyncClientType))
@@ -660,6 +660,8 @@ Example usage:
 
 ;; * synchronous and asynchronous generation methods requiring user authentication
 ;; ----------------------------------------------------
+
+;; FIXME: non-streaming text, note overloading of `stream`
 
 (defmethod _completion [#^ OpenAI client messages * [stream True] [max-tokens 4000] #** kwargs]
   "Generate a streaming completion using the chat completion endpoint."
