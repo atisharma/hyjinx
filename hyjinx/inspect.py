@@ -154,13 +154,17 @@ def findsource(object):
         # Calling read_many / compile can execute code.
         # Cache pst on first compile?
         elif isclass(object):
-            qualname = object.__qualname__
-            source = ''.join(lines)
-            hst = read_many(source, filename=file, skip_shebang=True)
-            pst = hy_compile(hst, module, filename=file, source=source)
-            class_finder = inspect._ClassFinder(qualname)
             try:
-                return class_finder.visit(pst)
+                # _ClassFinder not in python 13, but findsource works directly
+                if sys.version_info <= (3, 12):
+                    qualname = object.__qualname__
+                    source = ''.join(lines)
+                    hst = read_many(source, filename=file, skip_shebang=True)
+                    pst = hy_compile(hst, module, filename=file, source=source)
+                    class_finder = inspect._ClassFinder(qualname)
+                    return class_finder.visit(pst)
+                else:
+                    return findsource(object)
             except (inspect.ClassFoundException,) as e:
                 return (lines, e.args[0])
         elif ismultimethod(object):
