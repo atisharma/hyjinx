@@ -19,23 +19,26 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Programming Language :: Lisp",
     "Programming Language :: Hy",
     "Topic :: Software Development :: Libraries",
     "Topic :: Utilities"
 ]
 dependencies = [
-    "hy",
-    "hyrule",
-    "toolz",
-    "more-itertools",
-    "pansi==2020.7.3",
     "ansi-escapes",
+    "beautifhy",
+    "colorist",
+    "hy>=1.0.0",
+    "hyrule",
+    "json-repair",
+    "more-itertools",
+    "multimethod",
     "platformdirs",
     "pygments",
-    "multimethod==1.12",
     "python-magic",
-    "json-repair"
+    "toolz"
 ]
 
 [project.optional-dependencies]
@@ -52,10 +55,6 @@ version = {attr = "hyjinx.__version__"}
 
 [tool.setuptools.package-data]
 "*" = ["*.hy"]
-
-[project.scripts]
-hy-beautify = "hyjinx:__cli_grind_files"
-hylight = "hyjinx:__cli_hylight_files"
 
 # ... other project metadata fields as listed in:
 #     https://packaging.python.org/en/latest/guides/writing-pyproject-toml/

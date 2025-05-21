@@ -12,7 +12,7 @@ Convenience things for ndarrays, matrices and numerical data.
 (import numpy)
 (import numpy [ndarray])
 (import shutil)
-(import pansi [ansi :as _ansi])
+(import colorist [BrightColor Color Effect])
 
 ;; user probably doesn't have jax available
 ;; this is useful for methods on both array types
@@ -25,16 +25,16 @@ Convenience things for ndarrays, matrices and numerical data.
 ;; * Matrices and arrays
 ;; ----------------------------------------------------
 
-(setv _colors [_ansi.blue
-               _ansi.green
-               _ansi.yellow
-               _ansi.cyan
-               _ansi.magenta
-               _ansi.BLUE
-               _ansi.GREEN
-               _ansi.MAGENTA
-               _ansi.CYAN
-               _ansi.MAGENTA])
+(setv _colors [Color.BLUE
+               Color.GREEN
+               Color.YELLOW
+               Color.CYAN
+               Color.MAGENTA
+               BrightColor.BLUE
+               BrightColor.GREEN
+               BrightColor.MAGENTA
+               BrightColor.CYAN
+               BrightColor.MAGENTA])
 
 (defn last-col [m]
   "Return the last column of m."
@@ -77,7 +77,7 @@ Convenience things for ndarrays, matrices and numerical data.
                (list (map (partial ppa #** kwargs) a))
                (print (+ col
                          (describe a)
-                         _ansi.reset))))))
+                         Color.OFF))))))
 
 (defn describe [#^ ndarray a]
   f"{a.ndim}D: {(.join "×" (map str a.shape))}  ({(prod a.shape)} elements)  {a.dtype}  {a.nbytes}B")
@@ -107,8 +107,8 @@ Convenience things for ndarrays, matrices and numerical data.
   (let [padding "  "
         s (_pformat-array v #** kwargs)
         br-width (+ 2 (len s))
-        tl-corner f"{_ansi.green}╭── {(describe v)}\n│{_ansi.reset}"
-        br-corner f"{_ansi.green}│\n{"──╯" :>{br-width}}{_ansi.reset} "]
+        tl-corner f"{Color.GREEN}╭── {(describe v)}\n│{Color.OFF}"
+        br-corner f"{Color.GREEN}│\n{"──╯" :>{br-width}}{Color.OFF} "]
     (+ tl-corner s br-corner)))
 
 (defn _add-corners-2d [#^ ndarray m
@@ -118,8 +118,8 @@ Convenience things for ndarrays, matrices and numerical data.
         s (_pformat-array m #** kwargs)
         lines (.split s "\n")
         br-width (len (last lines))
-        tl-corner f"{_ansi.blue}╭── {(describe m)}\n│{_ansi.reset} "
-        br-corner f" {_ansi.blue}│\n{"──╯" :>{br-width}}{_ansi.reset} "]
+        tl-corner f"{Color.BLUE}╭── {(describe m)}\n│{Color.OFF} "
+        br-corner f" {Color.BLUE}│\n{"──╯" :>{br-width}}{Color.OFF} "]
     (-> s
         (.replace "[ " tl-corner)
         (.replace " ]" br-corner))))

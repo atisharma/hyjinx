@@ -2,16 +2,16 @@
 
 *Functions and macros useful for modern living in the [Hy](http://hylang.org) REPL.*
 
-Compatible with Hy 0.29.0.
+Compatible with Hy>=1.0
 
 
 ### Hylights
 
-- A Hy code beautifier and in-REPL syntax highlighting
+- A sensible, lispy `defmethod`
+- ~~A Hy code beautifier and in-REPL syntax highlighting~~ -- now moved to [beautifhy](https://github.com/atisharma/beautifhy)
 - An `inspect` module that works like Python's, but also for Hy code
 - Pretty tracebacks with correct syntax highlighting for hy or python
 - Print/get/edit source code of a function, module etc. (e.g. `(print-source hyjinx.lib.sieve)`
-- A sensible, lispy `defmethod`
 - In-repl code analysis and discussion using LLMs (e.g. for writing docstrings)
 - In-repl syntax highlighting and latex rendering (for [sixel-capable terminals](https://www.arewesixelyet.com)) for LLM replies
 - Numpy array pretty printing

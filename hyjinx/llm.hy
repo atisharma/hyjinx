@@ -90,7 +90,7 @@ Example usage:
 (import types [ModuleType FunctionType MethodType TracebackType])
 (import itertools [tee])
 (import json.decoder [JSONDecodeError])
-(import pansi [ansi])
+(import colorist [BrightColor Color Effect])
 
 (try
   (import openai [OpenAI :as _OpenAI])
@@ -256,8 +256,8 @@ Example usage:
                   content (if (isinstance (:content m) str)
                             (:content m)
                             (.join "\n" (lfor t (:content m) (:text t "<b64encoded image>"))))]
-              f"{color}{ansi.b}{role}{ansi._b}\n{(* "─" (len role))}\n{content}"))
-       ansi.reset]))
+              f"{color}{role}\n{(* "─" (len role))}\n{content}"))
+       Color.OFF]))
 
   (defn clear [self]
     "Delete all the chat messages."
@@ -265,13 +265,12 @@ Example usage:
 
   (defn chat [self]
     "A back-and-forth chat that ends when an empty input or EOF (Ctrl-D) is given."
-    (let [prompt f"{ansi.BLUE}>{ansi.reset}{ansi.b} "]
+    (let [prompt f"{BrightColor.BLUE}>{Color.OFF} "]
       (try
         (while (setx text (input prompt))
-          (print ansi._b :end "")
           (self.__call__ text))
         (except [EOFError]
-          (print f"{ansi.red}EOF{ansi.reset}")))))
+          (print f"{Color.RED}EOF{Color.OFF}")))))
 
   (defn save [self fname]
     "Save the messages (only) in json format to fname."
@@ -296,7 +295,7 @@ Example usage:
                      [image None]
                      [echo True]
                      [system-prompt None]
-                     [color ansi.reset]
+                     [color Color.OFF]
                      #** kwargs]
   "Just ask a general instruction or question, no object, no chat."
   (let [usr (if image
@@ -311,7 +310,7 @@ Example usage:
 (defmethod instruct [client #^ str prompt #^ HasCodeType obj *
                      [echo True]
                      [system-prompt None]
-                     [color ansi.reset]
+                     [color Color.OFF]
                      #** kwargs]
   "Instruct a hy or python object's source code."
   (let [details (get-source-details obj)
@@ -448,7 +447,7 @@ Example usage:
 (defn _fprint [s]
   (print s :flush True :end ""))
 
-(defn _print-stream [stream * [bg "dark"] [color ansi.reset]]
+(defn _print-stream [stream * [bg "dark"] [color Color.OFF]]
   "Print a streaming chat completion.
   Applies syntax highlighting to the string inside a code fence.
   Any syntax-highlighted strings are printed as streamed."
@@ -489,7 +488,7 @@ Example usage:
           :else
           (_fprint content))))
 
-    (print ansi.reset)))
+    (print Color.OFF)))
 
 (defn _print-code-block [stream * [fence "```"] [lang ""] [code ""] [bg "dark"]]
   "Applies syntax highlighting to a streaming chat completion,
@@ -588,7 +587,7 @@ Example usage:
                               :timeout timeout)]
       (if response.is-success
           (response.json)
-          (raise (TabbyClientError f"{ansi.red}{response.status-code}\n{(pformat (:detail (response.json)) :indent 2)}{ansi.reset}")))))
+          (raise (TabbyClientError f"{Color.RED}{response.status-code}\n{(pformat (:detail (response.json)) :indent 2)}{Color.OFF}")))))
 
   (defn _post [self endpoint * [admin False] [timeout 20] #** data]
     "POST to an authenticated endpoint or raise error."
@@ -604,7 +603,7 @@ Example usage:
             (.json response)
             (except [e [JSONDecodeError TypeError]]
               response))
-          (raise (TabbyClientError f"{ansi.red}{response.status-code}\n{(pformat (:detail (response.json)) :indent 2)}{ansi.reset}"))))))
+          (raise (TabbyClientError f"{Color.RED}{response.status-code}\n{(pformat (:detail (response.json)) :indent 2)}{Color.OFF}"))))))
 
 
 (defclass AsyncTabbyClient [AsyncOpenAI]
@@ -635,7 +634,7 @@ Example usage:
                               :timeout timeout)]
       (if response.is-success
           (response.json)
-          (raise (TabbyClientError f"{ansi.red}{response.status-code}\n{(pformat (:detail (response.json)) :indent 2)}{ansi.reset}")))))
+          (raise (TabbyClientError f"{Color.RED}{response.status-code}\n{(pformat (:detail (response.json)) :indent 2)}{Color.OFF}")))))
 
   (defn _post [self endpoint * [admin False] [timeout 20] #** data]
     "POST to an authenticated endpoint or raise error."
@@ -651,7 +650,7 @@ Example usage:
             (.json response)
             (except [e [JSONDecodeError TypeError]]
               response))
-          (raise (TabbyClientError f"{ansi.red}{response.status-code}\n{(pformat (:detail (response.json)) :indent 2)}{ansi.reset}"))))))
+          (raise (TabbyClientError f"{Color.RED}{response.status-code}\n{(pformat (:detail (response.json)) :indent 2)}{Color.OFF}"))))))
 
 
 ;; has to be defined after classes

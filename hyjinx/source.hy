@@ -18,12 +18,12 @@ Utilities for code inspection and presentation.
 (import pygments [highlight])
 (import pygments.lexers [get-lexer-by-name HyLexer PythonLexer PythonTracebackLexer guess-lexer])
 (import pygments.formatters [TerminalFormatter])
-(import pansi [ansi :as _ansi])
+(import colorist [Color BrightColor Effect])
 
 (import hyjinx.inspect [currentframe stack
                         ismodule findsource
                         getmodule getcomments getsource getsourcefile])
-(import hyjinx.beautify [grind])
+(import beautifhy.beautify [grind])
 
 (import hyjinx.lib [slurp])
 
@@ -81,7 +81,8 @@ Utilities for code inspection and presentation.
 
 (defmethod print-source [#^ multimethod obj #** kwargs]
   "Pretty-print the source code of a multimethod, with syntax highlighting."
-  (for [f (obj.values)]
+  ;; work on copy so that obj is populated and reaches its final size
+  (for [f (.values (.copy obj))]
     (print-source f #** kwargs)))
 
 (defmethod print-source [#^ partial obj * [linenos False] #** kwargs]
@@ -102,7 +103,7 @@ Utilities for code inspection and presentation.
   (let [details (get-source-details obj)
         padding (if linenos "      " "")
         language (:language details)
-        header f"{padding}{obj}, module {(:module details)}\n{padding}File {_ansi.b}{(:file details)}{_ansi._b}, line {(:line details)}"
+        header f"{padding}{obj}, module {(:module details)}\n{padding}File {Effect.BOLD}{(:file details)}, line {(:line details)}"
         lexer (get-lexer-by-name language)
         formatter (TerminalFormatter :linenos linenos
                                      :bg bg
@@ -136,11 +137,11 @@ Utilities for code inspection and presentation.
     ;; give the nested REPL an extended prompt by setting sys.ps*
     (setv old-ps1 sys.ps1
           old-ps2 sys.ps2
-          sys.ps1 (+ _ansi.GREEN module "." caller " " sys.ps1 _ansi.reset)
-          sys.ps2 (+ _ansi.RED module "." caller "." sys.ps2 _ansi.reset))
+          sys.ps1 (+ BrightColor.GREEN module "." caller " " sys.ps1 Color.OFF)
+          sys.ps2 (+ BrightColor.RED module "." caller "." sys.ps2 Color.OFF))
     (try
-      (.interact repl f"{_ansi.GREEN}nested REPL {caller} - ctrl-D to exit.
-File {_ansi.b}{filename}{_ansi._b}, line {lineno}{_ansi.reset}")
+      (.interact repl f"{BrightColor.GREEN}nested REPL {caller} - ctrl-D to exit.
+File {Effect.BOLD}{filename}, line {lineno}{Color.OFF}")
       (finally
         (del caller-frame)
         (setv sys.ps1 old-ps1
@@ -189,7 +190,7 @@ File {_ansi.b}{filename}{_ansi._b}, line {lineno}{_ansi.reset}")
             code-lexer (get-lexer-by-name lang)
             code-formatter (TerminalFormatter :bg bg :stripall True :linenos linenos)]
         (setv code-formatter._lineno (- lineno lines-around))
-        (sys.stderr.write f"  File {_ansi.b}{filename}{_ansi._b}, line {lineno}\n")
+        (sys.stderr.write f"  File {Effect.BOLD}{filename}, line {lineno}\n")
         (-> (.join "\n" lines)
             (highlight code-lexer code-formatter)
             (sys.stderr.write))

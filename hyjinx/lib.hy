@@ -295,7 +295,7 @@ See individual function docstrings for detailed information.
 
 (defn hash-color [s]
   "A hex RGB colour mapped from a string."
-  (import pansi [ansi])
+  (import colorist [ColorHex])
   (let [S (.upper s)
         i (-> (.upper s)
               (.encode "utf-8")
@@ -303,7 +303,7 @@ See individual function docstrings for detailed information.
               (.hexdigest)
               (int 16)
               (% (** 2 24)))]
-    (get ansi.rgb (.replace f"{i :#08x}" "0x" "#"))))
+    (ColorHex (.replace f"{i :#08x}" "0x" "#"))))
 
 (defn progress [string #** kwargs]
   "Simple multi-line progress output.
@@ -459,10 +459,10 @@ See individual function docstrings for detailed information.
     (hy.I.json.dump obj f :indent 4)))
 
 (defn jappend [record fname * [encoding "utf-8"]]
- "Append / write a dict to a file as json.
+  "Append / write a dict to a file as json.
   If the file does not exist, initialise a file with the record.
   If the file exists, append to it.
- Cobbled together from https://stackoverflow.com/a/31224105
+  Cobbled together from https://stackoverflow.com/a/31224105
   it overwrites the closing ']' with the new record + a new ']'.
   POSIX expects a trailing newline. Assumes utf-8."
   (if (Path.is-file (Path fname))

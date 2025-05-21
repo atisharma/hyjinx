@@ -164,7 +164,7 @@ def findsource(object):
                     class_finder = inspect._ClassFinder(qualname)
                     return class_finder.visit(pst)
                 else:
-                    return findsource(object)
+                    return inspect.findsource(object)
             except (inspect.ClassFoundException,) as e:
                 return (lines, e.args[0])
         elif ismultimethod(object):
