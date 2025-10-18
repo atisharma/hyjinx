@@ -68,12 +68,6 @@ Copy this somewhere and set HYSTARTUP to its location."
   (except [NameError]
     (setv repl-output-fn (partial pformat :indent 2))))
 
-;; * nice prompt for Hy 0.29.0
-;; ----------------------------------------------------
-
-(setv repl-ps1 "\x01\x1b[0;32m\x02=> \x01\x1b[0m\x02"
-      repl-ps2 "\x01\x1b[0;31m\x02... \x01\x1b[0m\x02")
-
 ;; * each directory has its own hist file
 ;; ----------------------------------------------------
 

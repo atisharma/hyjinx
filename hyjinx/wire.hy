@@ -12,7 +12,7 @@
 
 
 (setv sender-id (. (uuid1) hex))
-(setv HYJINX_PROTOCOL_VERSION "0.1.1")
+(setv HYJINX_PROTOCOL_VERSION "0.1.2")
 (setv rpcs {})
 
 
@@ -62,8 +62,7 @@
 
 (defn :async handoff [payload]
   "Call the requested client async method (coroutine).
-  Return result of `(await (method #* args))`."
-  (let [method (.pop payload "method" None)
-        kwargs (:kwargs payload {})]
+  Return result of `(await (method #** payload #** kwargs))`."
+  (let [method (.pop payload "method" None)]
     (when (in method rpcs)
       (await ((get rpcs method) #** payload)))))

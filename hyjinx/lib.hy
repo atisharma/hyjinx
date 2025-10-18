@@ -155,19 +155,6 @@ See individual function docstrings for detailed information.
   "Directory listing."
   (os.listdir path))
 
-(defn grepp [regex lines * [line-nos False]]
-  "Search for regular expressions in lines of text.
-  Return items in a string or iterable of strings (lines) that match a regular expression.
-  If `line-nos` is True, return the matching lines with their line numbers.
-  The default is False, which returns only the matching lines."
-  (let [rx (re.compile regex)
-        line-list (if (isinstance lines str)
-                    (.split lines "\n")
-                    lines)]
-    (if line-nos
-      (lfor [index line] (enumerate line-list) :if (re.search regex line) f"{index :04d}: {line}")
-      (lfor line line-list :if (re.search regex line) line))))
-
 (defn shell [[shell "bash"] #* args]
   "Run an interactive shell as a subprocess.
   Usually, you would instead suspend Hy with ctrl-z."
@@ -184,6 +171,19 @@ See individual function docstrings for detailed information.
 
 ;; * Strings
 ;; ----------------------------------------------------
+
+(defn grepp [regex lines * [line-nos False]]
+  "Search for regular expressions in lines of text.
+  Return items in a string or iterable of strings (lines) that match a regular expression.
+  If `line-nos` is True, return the matching lines with their line numbers.
+  The default is False, which returns only the matching lines."
+  (let [rx (re.compile regex)
+        line-list (if (isinstance lines str)
+                    (.split lines "\n")
+                    lines)]
+    (if line-nos
+      (lfor [index line] (enumerate line-list) :if (re.search regex line) f"{index :04d}: {line}")
+      (lfor line line-list :if (re.search regex line) line))))
 
 (defn get-numeric [text]
   "Extract a flat list of numbers by appearance."
@@ -294,7 +294,7 @@ See individual function docstrings for detailed information.
     (hyrule-pp x :indent 2 :width (- term.columns 5) #* args #** kwargs)))
 
 (defn hash-color [s]
-  "A hex RGB colour mapped from a string."
+  "A hex RGB colour mapped deterministically from the hash of a string."
   (import colorist [ColorHex])
   (let [S (.upper s)
         i (-> (.upper s)
