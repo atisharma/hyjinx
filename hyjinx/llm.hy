@@ -580,7 +580,7 @@ Example usage:
   (defn _get [self endpoint * [admin False] [timeout 20]]
     "GET an authenticated endpoint or raise error."
     (let [auth (if admin
-                   {"x-api-key" self._admin-key}
+                   {"x-api-key" self._admin-key} ; fall back to api-key
                    {"x-api-key" self.api-key})
           response (httpx.get (.join self.base-url endpoint)
                               :headers auth
@@ -624,10 +624,40 @@ Example usage:
     (setv self._admin_key (.pop kwargs "admin_key" None))
     (.__init__ (super) #** kwargs))
 
+  (defn :async _async-get [self endpoint * [admin False] [timeout 20]]
+    "GET an authenticated endpoint or raise error."
+    (let [auth (if admin
+                   {"x-api-key" self._admin-key} ; fall back to api-key
+                   {"x-api-key" self.api-key})]
+      (with [:async client (httpx.AsyncClient)]
+        (let [response (await (client.get :url (.join self.base-url endpoint)
+                                          :headers auth
+                                          :timeout timeout))]
+          (if response.is-success
+              (response.json)
+              (raise (TabbyClientError f"{Color.RED}{response.status-code}\n{(pformat (:detail (response.json)) :indent 2)}{Color.OFF}")))))))
+
+  (defn :async _async-post [self endpoint * [admin False] [timeout 20] #** data]
+    "POST to an authenticated endpoint or raise error."
+    (let [auth (if admin
+                   {"x-admin-key" self._admin-key}
+                   {"x-api-key" self.api-key})]
+      (with [:async client (httpx.AsyncClient)]
+        (let [response (await (client.post :url (.join self.base-url endpoint)
+                                           :headers auth
+                                           :json (or data {})
+                                           :timeout timeout))]
+          (if response.is-success
+              (try
+                (.json response)
+                (except [e [JSONDecodeError TypeError]]
+                  response))
+              (raise (TabbyClientError f"{Color.RED}{response.status-code}\n{(pformat (:detail (response.json)) :indent 2)}{Color.OFF}")))))))
+
   (defn _get [self endpoint * [admin False] [timeout 20]]
     "GET an authenticated endpoint or raise error."
     (let [auth (if admin
-                   {"x-api-key" self._admin-key}
+                   {"x-api-key" self._admin-key} ; fall back to api-key
                    {"x-api-key" self.api-key})
           response (httpx.get (.join self.base-url endpoint)
                               :headers auth
@@ -660,7 +690,7 @@ Example usage:
 ;; * synchronous and asynchronous generation methods requiring user authentication
 ;; ----------------------------------------------------
 
-;; FIXME: non-streaming text, note overloading of `stream`
+;; FIXME non-streaming text, note overloading of `stream`
 
 (defmethod _completion [#^ OpenAI client messages * [stream True] [max-tokens 4000] #** kwargs]
   "Generate a streaming completion using the chat completion endpoint."
@@ -850,12 +880,27 @@ Example usage:
   kwargs are passed to the API.
   See the TabbyAPI docs for valid keys and values, for example, to load
   draft models for speculative decoding."
-  ;; TODO : stream response to show progress
+  ;; TODO stream response to show progress
   (let [response (client._post "model/load"
                                :admin True
-                               :name model
+                               :model-name model
                                :timeout None
                                #** kwargs)]
+    (setv client.model model)
+    (print f"{model} loaded.")))
+
+(defmethod :async async-model-load [#^ AsyncTabbyClient client #^ str model #** kwargs]
+  "Load a model async.
+  TabbyAPI needs to load/unload models before use.
+  kwargs are passed to the API.
+  See the TabbyAPI docs for valid keys and values, for example, to load
+  draft models for speculative decoding."
+  ;; TODO stream response to show progress
+  (let [response (await (client._async-post "model/load"
+                                            :admin True
+                                            :model-name model
+                                            :timeout None
+                                            #** kwargs))]
     (setv client.model model)
     (print f"{model} loaded.")))
 
@@ -873,6 +918,14 @@ Example usage:
                 :admin True
                 :loras loras
                 :timeout None))
+    
+(defmethod :async async-lora-load [#^ AsyncTabbyClient client #^ list loras]
+  "Load LoRAs when using TabbyAPI.
+  loras is a list of dicts, with 'name', 'scaling' as keys."
+  (await (client._async-post "lora/load"
+                             :admin True
+                             :loras loras
+                             :timeout None)))
     
 (defmethod lora-load [#^ TabbyClientType client #^ str lora * [scaling 1.0]]
   "Load a single LoRA when using TabbyAPI.
