@@ -7,16 +7,17 @@ Compatible with Hy>=1.0
 
 ### Hylights
 
-- A sensible, lispy `defmethod`
+- A sensible, lispy `defmethod` (polymorphic type dispatch)
 - ~~A Hy code beautifier and in-REPL syntax highlighting~~ -- now moved to [beautifhy](https://github.com/atisharma/beautifhy)
 - An `inspect` module that works like Python's, but also for Hy code
 - Pretty tracebacks with correct syntax highlighting for hy or python
 - Print/get/edit source code of a function, module etc.; e.g. `(print-source hyjinx.lib.sieve)`
-- In-repl code analysis and discussion using LLMs (e.g. for writing docstrings)
+- In-repl code analysis and discussion using LLMs (e.g. for writing docstrings, code review)
 - In-repl syntax highlighting and latex rendering (for [sixel-capable terminals](https://www.arewesixelyet.com)) for LLM replies
 - Numpy array pretty printing
 - A zmq lazy pirate protocol
 - A minimal ncurses class
+- An async actor-model class
 
 
 ### Modules
@@ -25,12 +26,10 @@ Compatible with Hy>=1.0
 - hyjinx.source: live code inspection.
 - hyjinx.inspect: code inspection.
 - hyjinx.doc: peruse hy documentation.
+- hyjinx.actors: the async `Actor` class and `defactor` macro
 - hyjinx.screen: a convenient ncurses wrapper.
-
 - hyjinx.mat: numpy pretty-printing for humans. (requires numpy, jax optional)
-
 - hyjinx.[zmq_client, zmq_server, crypto, wire]: lazy-pirate zmq RPC architecture. (requires zmq, ecdsa, zstandard, msgpack)
-
 - hyjinx.llm: discuss code with a Large Language Model (AI). TabbyAPI, OpenAI-compatible and Claude are supported. (requires `openai` and `anthropic` packages.)
 
 

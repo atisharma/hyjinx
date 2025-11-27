@@ -30,7 +30,7 @@ dependencies = [
     "ansi-escapes",
     "beautifhy",
     "colorist",
-    "hy>=1.0.0",
+    "hy>=1.1.0",
     "hyrule",
     "json-repair",
     "more-itertools",
