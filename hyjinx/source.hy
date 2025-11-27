@@ -164,7 +164,7 @@ File {Effect.BOLD}{filename}, line {lineno}{Color.OFF}")
 
 (defn _exception-hook [exc-type exc-value tb *
                        [bg "dark"]
-                       [limit 4]
+                       [limit 5]
                        [lines-around 2]
                        [linenos True]
                        [ignore ["hy/repl.py"]]]
