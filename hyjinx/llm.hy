@@ -73,6 +73,7 @@ Example usage:
 (import shutil)
 (import base64)
 (import tempfile [TemporaryDirectory NamedTemporaryFile])
+(import logging)
 
 (require hyrule [-> ->> unless of loop])
 (require hyjinx.macros [defmethod rest lmap])
@@ -91,6 +92,7 @@ Example usage:
 (import itertools [tee])
 (import json.decoder [JSONDecodeError])
 (import colorist [BrightColor Color Effect])
+
 
 (try
   (import openai [OpenAI :as _OpenAI])
@@ -695,10 +697,10 @@ Example usage:
 (defmethod _completion [#^ OpenAI client messages * [stream True] [max-tokens 4000] #** kwargs]
   "Generate a streaming completion using the chat completion endpoint."
   (let [stream (client.chat.completions.create
-                 :model (.pop kwargs "model" (getattr client "model" "gpt-4o"))
+                 :model (.pop kwargs "model" (getattr client "model"))
                  :messages messages
                  :stream stream
-                 :max-tokens max-tokens
+                 :max-completion-tokens max-tokens
                  #** client._defaults
                  #** kwargs)]
     (for [chunk stream :if chunk.choices]
@@ -713,7 +715,7 @@ Example usage:
                  :model (.pop kwargs "model" (getattr client "model" None))
                  :messages messages
                  :stream stream
-                 :max-tokens max-tokens
+                 :max-completion-tokens max-tokens
                  #** client._defaults
                  #** kwargs)]
     (for [chunk stream :if chunk.choices]
@@ -725,7 +727,7 @@ Example usage:
 (defmethod _completion [#^ Huggingface client messages * [stream True] [max-tokens 4000] #** kwargs]
   "Generate a streaming completion using the chat completion endpoint."
   (let [stream (client.chat.completions.create
-                 :model (.pop kwargs "model" (getattr client "model" "Qwen/Qwen2.5-72B-Instruct"))
+                 :model (.pop kwargs "model" (getattr client "model"))
                  :messages messages
                  :stream stream
                  :max-tokens max-tokens
@@ -747,7 +749,7 @@ Example usage:
                        :if (not (= (:role m) "system"))
                        m)]
     (with [stream (client.messages.stream
-                    :model (.pop kwargs "model" (getattr client "model" "claude-3-5-sonnet"))
+                    :model (.pop kwargs "model" (getattr client "model"))
                     :system system-messages
                     :messages messages
                     :max-tokens max-tokens
@@ -759,10 +761,10 @@ Example usage:
 (defmethod :async _completion [#^ AsyncOpenAI client messages * [stream True] [max-tokens 4000] #** kwargs]
   "Generate a streaming completion using the chat completion endpoint."
   (let [stream (await (client.chat.completions.create
-                        :model (.pop kwargs "model" (getattr client "model" "gpt-4o"))
+                        :model (.pop kwargs "model" (getattr client "model"))
                         :messages messages
                         :stream stream
-                        :max-tokens max-tokens
+                        :max-completion-tokens max-tokens
                         #** client._defaults
                         #** kwargs))]
     (for [chunk stream :if chunk.choices]
@@ -777,7 +779,7 @@ Example usage:
                         :model (.pop kwargs "model" (getattr client "model" None))
                         :messages messages
                         :stream stream
-                        :max-tokens max-tokens
+                        :max-completion-tokens max-tokens
                         #** client._defaults
                         #** kwargs))]
     (for [chunk stream :if chunk.choices]
@@ -796,7 +798,7 @@ Example usage:
                        :if (not (= (:role m) "system"))
                        m)]
     (with [stream (await (client.messages.stream
-                           :model (.pop kwargs "model" (getattr client "model" "claude-3-5-sonnet"))
+                           :model (.pop kwargs "model" (getattr client "model"))
                            :system system-messages
                            :messages messages
                            :max-tokens max-tokens
