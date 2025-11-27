@@ -308,6 +308,7 @@ See individual function docstrings for detailed information.
 (defn progress [string #** kwargs]
   "Simple multi-line progress output.
   Splits string on newline, substitutes in kwargs with its `.format` method."
+  ;; Probably you want tqdm
   (let [cols (- (. (hy.I.shutil.get-terminal-size) columns) 10)
         strings (.split string "\n")]
     (for [s strings]
@@ -479,6 +480,10 @@ See individual function docstrings for detailed information.
                  :mode "q"
                  :encoding encoding)]
     (f.write (+ (json.dumps obj) "\n"))))
+
+(defn jprint [string * [indent 2]]
+  "Pretty-print json."
+  (print (json.jumps string :indent indent)))
 
 (defn filetype [fname]
   "Guess the file type from various cues.
