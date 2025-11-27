@@ -4,6 +4,7 @@ You'll need to start the main using (.wrapper curses ...)."
 (require hyrule [unless -> ->>])
 
 (import curses)
+(import curses.textpad [Textbox])
 (import logging)
 
 
@@ -32,7 +33,7 @@ You'll need to start the main using (.wrapper curses ...)."
     (self.clear))
 
   (defn __del__ [self]
-    (.clear self.stdscr)
+    ;(.clear self.stdscr)
     (.curs_set curses True))
 
   (defn __enter__ [self]
@@ -78,11 +79,11 @@ You'll need to start the main using (.wrapper curses ...)."
     "Get input in a text box."
     (let [y (- curses.LINES 2)
           x (+ 1 (len prompt))
-          tw (.newwin curses 1 (- curses.COLS 1) y 1)]
-      (.put self y 1 prompt) 
+          tw (.newwin curses 1 (- curses.COLS 1) y (+ 1 (len prompt)))]
+      (.put self y 0 prompt) 
       (.refresh self.window)
       (.bkgdset tw (| (.color_pair curses 191) curses.A_REVERSE))
-      (let [tb (.Textbox curses.textpad tw :insert-mode True)]
+      (let [tb (Textbox tw :insert-mode True)]
         (.edit tb)
         (setv instr (.strip (tb.gather)))
         (.clear tw)
