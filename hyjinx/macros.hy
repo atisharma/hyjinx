@@ -122,6 +122,23 @@ Macros for Flow Control
   "
   `(defn [property] ~f [self] ~@body))
   
+(defmacro defdataclass [c #* body]
+  "Dataclass definition using the dataclass decorator.
+
+  `(defdataclass c
+     #^ int x
+     #^ str s)`
+
+  is equivalent to the following Python code:
+
+  `@dataclass
+  class c:
+    x: int
+    s: str`
+  "
+  `(defclass [hy.I.dataclasses.dataclass] ~c []
+     ~@body))
+
 
 ;; * macros for pytest
 ;; ----------------------------------------------------
