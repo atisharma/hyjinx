@@ -14,6 +14,7 @@ Utilities for code inspection and presentation.
 (import functools [partial])
 
 (import sys os traceback subprocess shutil)
+(import pathlib [Path])
 
 (import pygments [highlight])
 (import pygments.lexers [get-lexer-by-name HyLexer PythonLexer PythonTracebackLexer guess-lexer])
@@ -21,9 +22,10 @@ Utilities for code inspection and presentation.
 (import colorist [Color BrightColor Effect])
 
 (import hyjinx.inspect [currentframe stack
-                        ismodule findsource
+                        ismodule findsource isbuiltin ismethod isfunction
                         getmodule getcomments getsource getsourcefile])
 (import beautifhy.beautify [grind])
+(import beautifhy.highlight [hylight])
 
 (import hyjinx.lib [slurp])
 
@@ -56,16 +58,19 @@ Utilities for code inspection and presentation.
 
 (defn _get-lang-from-filename [filename]
   "Guess the language from the filename extension."
-  (match (last (.split filename "."))
-    "py" "python"
-    "hy" "hylang"
-    "pytb" "pytb"
-    "py3tb" "py3tb"))
+  (match (. (Path filename) suffix)
+    ".py" "python"
+    ".hy" "hylang"
+    ".pytb" "pytb"
+    ".py3tb" "py3tb"))
+
 
 (defn get-source-details [obj]
   "Return a dict with line number, source file of object, etc."
   (let [file (getsourcefile obj)
         module (cond (ismodule obj) obj.__name__
+                     (hasattr obj "__module__") obj.__module__
+                     (hasattr obj "__class__") (get-source-details obj.__class__)
                      :else obj.__module__)
         ext (last (.split file "."))
         lang (_get-lang-from-filename file)
@@ -97,26 +102,37 @@ Utilities for code inspection and presentation.
     (print f"keyword args: {obj.keywords}")
     (print)))
 
-(defmethod print-source [obj * [bg "light"] [linenos False] [details None]]
-  "Pretty-print the source code of module or function obj, with syntax highlighting.
+(defmethod print-source [obj * [bg "dark"] [linenos False] [details None]]
+  "Pretty-print the source code of module, function, class, or class instance, with syntax highlighting.
   Keyword `bg` is \"dark\" or \"light\"."
-  (let [details (get-source-details obj)
-        padding (if linenos "      " "")
-        language (:language details)
-        header f"{padding}{obj}, module {(:module details)}\n{padding}File {Effect.BOLD}{(:file details)}, line {(:line details)}"
-        lexer (get-lexer-by-name language)
-        formatter (TerminalFormatter :linenos linenos
-                                     :bg bg
-                                     :stripall True)
-        source (if (= language "hylang")
-                   (grind (getsource obj) :filename (:file details))
-                   (getsource obj))]
-    ;; modify formatter so that line numbers correspond to the source
-    (setv formatter._lineno (:line details))
-    (print)
-    (print header)
-    (unless linenos (print))
-    (print (highlight source lexer formatter))))
+  ;; Handle class instances by delegating to their class definition
+  (if (and (hasattr obj "__class__")
+           (not (isinstance obj type))
+           (not (or (ismodule obj)
+                    (isfunction obj)
+                    (ismethod obj)
+                    (isbuiltin obj)
+                    (isbuiltin obj.__class__))))
+
+    (print-source obj.__class__ :bg bg :linenos linenos :details details)
+
+    (let [details (get-source-details obj)
+          padding (if linenos "      " "")
+          language (:language details)
+          header f"{padding}{obj}, module {(:module details)}\n{padding}File {Effect.BOLD}{(:file details)}, line {(:line details)}"
+          lexer (get-lexer-by-name language)
+          formatter (TerminalFormatter :linenos linenos
+                                       :bg bg
+                                       :stripall True)
+          source (if (= language "hylang")
+                     (grind (getsource obj) :filename (:file details))
+                     (getsource obj))]
+      ;; modify formatter so that line numbers correspond to the source
+      (setv formatter._lineno (:line details))
+      (print)
+      (print header)
+      (unless linenos (print))
+      (print (highlight source lexer formatter)))))
 
 (defn interact []
   "Interact with code from called point by starting a nested REPL
@@ -147,21 +163,7 @@ File {Effect.BOLD}{filename}, line {lineno}{Color.OFF}")
         (setv sys.ps1 old-ps1
               sys.ps2 old-ps2)))))
     
-(defn hylight [s * [bg "light"] [language "hylang"]]
-  "Syntax highlight a Hy (or other language) string.
-  Keyword `bg` is \"dark\" or \"light\".
-
-  This is nice for use in the repl - put
-  (import hyjinx.source [hylight])
-  (setv repl-output-fn hylight)
-  in your .hyrc."
-  (let [formatter (TerminalFormatter :bg bg :stripall True)
-        term (shutil.get-terminal-size)
-        lexer (get-lexer-by-name language)]
-    (highlight (pformat s :indent 2 :width (- term.columns 5))
-               (HyLexer)
-               formatter)))
-
+;; This is redundant now with hy-repl, but kept for now as it is a Hy implementation.
 (defn _exception-hook [exc-type exc-value tb *
                        [bg "dark"]
                        [limit 5]
@@ -179,7 +181,7 @@ File {Effect.BOLD}{filename}, line {lineno}{Color.OFF}")
         filename "")
   (while _tb
     (setv filename _tb.tb_frame.f_code.co_filename
-          ext (last (.split filename "."))
+          ext (. (Path filename) suffix)
           lang (_get-lang-from-filename filename))
     ;; code for top frame
     (if (and lang

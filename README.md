@@ -9,8 +9,8 @@ Compatible with Hy>=1.0
 
 - A sensible, lispy `defmethod` (polymorphic type dispatch)
 - ~~A Hy code beautifier and in-REPL syntax highlighting~~ -- now moved to [beautifhy](https://github.com/atisharma/beautifhy)
+~~- Pretty tracebacks with correct syntax highlighting for hy or python~~ -- now moved to [beautifhy](https://github.com/atisharma/beautifhy)
 - An `inspect` module that works like Python's, but also for Hy code
-- Pretty tracebacks with correct syntax highlighting for hy or python
 - Print/get/edit source code of a function, module etc.; e.g. `(print-source hyjinx.lib.sieve)`
 - In-repl code analysis and discussion using LLMs (e.g. for writing docstrings, code review)
 - In-repl syntax highlighting and latex rendering (for [sixel-capable terminals](https://www.arewesixelyet.com)) for LLM replies
@@ -49,14 +49,6 @@ To install offline hy/hyrule documentation,
 ```bash
 $ hy -m hyjinx.docs
 ```
-
-For syntax highlighting in the REPL, put 
-```hylang
-(import hyjinx.source [hylight]) (setv repl-output-fn hylight)
-```
-in your .hyrc.
-
-See hyjinx.hyrc for example usage.
 
 For in-terminal sixel rendering of latex in LLM replies, make sure pdflatex, dvipng and img2sixel are installed, and that you're using a sixel-capable terminal.
 
