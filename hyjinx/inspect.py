@@ -36,26 +36,6 @@ Here are some of the useful functions provided by this module:
     get_annotations() - safely compute an object's annotations
 """
 
-# TODO
-# - Add defensive checks for attribute existence before access
-# - Handle empty collections (empty multimethods)
-# - Validate line numbers are within bounds
-# - Add try-except blocks around `read_many()` and `hy_compile()` calls
-# - Handle `None` module references explicitly
-# - Document that `findsource()` executes reader macro code (security consideration)
-
-# FIXME
-# 1. Built-in functions/methods (even in `.hy` files)
-# 2. C extension objects
-# 3. Dynamically created classes/functions without proper metadata
-# 4. Partial objects wrapping builtins or lambdas
-# 5. Empty multimethods (no registered implementations)
-# 6. Objects with `__module__ = None`
-# 7. Hy AST nodes missing location metadata (`start_line`, `filename`)
-# 8. Mocked objects with incomplete `__code__` attributes
-# 9. Objects from `exec()`/`eval()` without proper file context
-# 10. Hy code with reader macros that fail during compilation in `findsource()`
-
 import os
 import sys
 import importlib
@@ -189,9 +169,6 @@ def findsource(object):
         return findsource(object.func)
 
     elif isExpression(object) or isLazy(object):
-        lnum = object.start_line
-        lines = linecache.getlines(file)
-        return (lines, lnum)
         if not hasattr(object, 'start_line') or object.start_line is None:
             raise OSError('source code not available')
         lnum = object.start_line

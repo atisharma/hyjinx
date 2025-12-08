@@ -1,5 +1,7 @@
 "
-Utilities for code inspection and presentation.
+Utilities for source code introspection, presentation, and interactive debugging.
+First-class support for both Hy and Python is provided.
+
 "
 
 (require hyrule [-> ->> unless])
@@ -102,9 +104,11 @@ Utilities for code inspection and presentation.
     (print f"keyword args: {obj.keywords}")
     (print)))
 
-(defmethod print-source [obj * [bg "dark"] [linenos False] [details None]]
+(defmethod print-source [obj * [bg "dark"] [linenos False] [details None] [reformat False]]
   "Pretty-print the source code of module, function, class, or class instance, with syntax highlighting.
-  Keyword `bg` is \"dark\" or \"light\"."
+
+  Keyword `bg` should be \"dark\" or \"light\".
+  If `reformat` is truthy, the code will be reformatted before printing."
   ;; Handle class instances by delegating to their class definition
   (if (and (hasattr obj "__class__")
            (not (isinstance obj type))
@@ -124,7 +128,7 @@ Utilities for code inspection and presentation.
           formatter (TerminalFormatter :linenos linenos
                                        :bg bg
                                        :stripall True)
-          source (if (= language "hylang")
+          source (if (and reformat (= language "hylang"))
                      (grind (getsource obj) :filename (:file details))
                      (getsource obj))]
       ;; modify formatter so that line numbers correspond to the source
