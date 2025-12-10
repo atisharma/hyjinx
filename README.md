@@ -9,7 +9,7 @@ Compatible with Hy>=1.0
 
 - A sensible, lispy `defmethod` (polymorphic type dispatch)
 - ~~A Hy code beautifier and in-REPL syntax highlighting~~ -- now moved to [beautifhy](https://github.com/atisharma/beautifhy)
-~~- Pretty tracebacks with correct syntax highlighting for hy or python~~ -- now moved to [beautifhy](https://github.com/atisharma/beautifhy)
+- ~~Pretty tracebacks with correct syntax highlighting for hy or python~~ -- now moved to [beautifhy](https://github.com/atisharma/beautifhy)
 - An `inspect` module that works like Python's, but also for Hy code
 - Print/get/edit source code of a function, module etc.; e.g. `(print-source hyjinx.lib.sieve)`
 - In-repl code analysis and discussion using LLMs (e.g. for writing docstrings, code review)
