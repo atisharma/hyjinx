@@ -46,19 +46,10 @@ import inspect
 from inspect import *
 from functools import partial
 
-from hy import repr
-from hy.reader import read, read_many
+from hy.reader import read, read_many, HyReader
 from hy.models import Expression, Lazy
 
-from beautifhy.reader import HyReader, HySafeReader
-
 from multimethod import multimethod
-
-# It would be better to subclass HyReader to a HySafeReader,
-# to avoid this dependency
-#from pygments.lexers import HyLexer
-#from pygments.token import Token
-
 
 def ismultimethod(object):
     return isinstance(object, multimethod)
@@ -194,7 +185,10 @@ def findsource(object):
                 if sys.version_info <= (3, 12):
                     qualname = object.__qualname__
                     source = ''.join(lines)
-                    hst = read_many(source, filename=file, skip_shebang=True, reader=HySafeReader())
+                    hst = read_many(source,
+                                    filename=file,
+                                    skip_shebang=True,
+                                    reader=Reader(use_current_macros=False))
                     pst = hy_compile(hst, module, filename=file, source=source)
                     class_finder = inspect._ClassFinder(qualname)
                     return class_finder.visit(pst)
@@ -287,11 +281,15 @@ def getsource(object):
     return ''.join(lines)
 
 def hy_getblock(lines):
-    """Extract the lines of code corresponding to the first Hy form from the given list of lines."""
-    # Read the first form and use its attributes
-    form = read(''.join(lines), reader=HySafeReader())
-    return lines[:form.end_line]
+    """Extract the lines of code corresponding to the first Hy form from the given list of lines.
 
+    Built-in Hy reader macros are allowed as safe, since they do not execute code.
+    User-defined reader macros could theoretically execute code, but they run during
+    parse time. Setting `use_current_readers=False` prevents them entirely.
+    """
+    # Read the first form and use its attributes
+    form = read(''.join(lines), reader=HyReader(use_current_readers=False))
+    return lines[:form.end_line]
 
 def getsourcelines(object):
     """Return a list of source lines and starting line number for a Hy or python object.
@@ -303,10 +301,6 @@ def getsourcelines(object):
     corresponding to the object and the line number indicates where in the
     original source file the first line of code was found. An OSError is
     raised if the source code cannot be retrieved.
-
-    This function involves applying a 'safe' subclassed Hy reader, which does
-    not execute any code defined in user-defined reader macros. This avoids
-    arbitrary code execution when inspecting untrusted objects.
     """
     object = inspect.unwrap(object)
     lines, lnum = findsource(object)
@@ -329,6 +323,9 @@ def getsourcelines(object):
         # Non-Hy object
         return inspect.getblock(lines[lnum:]), lnum + 1
 
+
+#from pygments.lexers import HyLexer
+#from pygments.token import Token
 def lexer_getsourcelines(object):
     """Return a list of source lines and starting line number for a Hy or python object.
 
