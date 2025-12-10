@@ -1,7 +1,6 @@
 "
 Utilities for source code introspection, presentation, and interactive debugging.
 First-class support for both Hy and Python is provided.
-
 "
 
 (require hyrule [-> ->> unless])
@@ -10,7 +9,6 @@ First-class support for both Hy and Python is provided.
 
 (import hyrule [inc dec pformat])
 (import hyjinx.lib [first second last])
-(import hy.repl [REPL])
 
 (import multimethod [multimethod])
 (import functools [partial])
@@ -28,6 +26,7 @@ First-class support for both Hy and Python is provided.
                         getmodule getcomments getsource getsourcefile])
 (import beautifhy.beautify [grind])
 (import beautifhy.highlight [hylight])
+(import beautifhy.repl [HyREPL :as REPL])
 
 (import hyjinx.lib [slurp])
 

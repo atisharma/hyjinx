@@ -1,15 +1,14 @@
 """
+🦑 - Functions and macros for modern living in the Hy REPL.
 
 ▌      ▖▗       
 ▛▀▖▌ ▌▗▖▄ ▛▀▖▚▗▘
 ▌ ▌▚▄▌ ▌▐ ▌ ▌▗▚ 
 ▘ ▘▗▄▘▄▘▀▘▘ ▘▘ ▘
 
-🦑 - Functions and macros for modern living in the Hy REPL.
-
 hyjinx.lib      - a smorgasbord of convenience functions.
 hyjinx.source   - code inspection.
-hyjinx.inspec   - code inspection, similar to python's inspect.
+hyjinx.inspect  - code inspection, similar to python's inspect.
 hyjinx.doc      - peruse hy documentation.
 hyjinx.actors   - a convenient asyncio agent model
 hyjinx.screen   - a convenient ncurses wrapper.

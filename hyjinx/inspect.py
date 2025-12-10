@@ -1,9 +1,10 @@
 """
 Get useful information from live Hy or Python objects.
 
-This module provides Hy compatibility with Cpython's inspect module.
-Its functionality has been extended to cover functools' `partial`
-objects and `multimethod`s.
+This module provides Hy compatibility with Cpython's inspect module. Its
+functionality has been extended to cover functools' `partial` objects and
+`multimethod`s. Within Hy, Hy macros are supported via Hy's `get_macro` macro,
+for example `(inspect.getsource (get-macro get-macro))`.
 
 Other functions are imported from CPython's `inspect` module. See below for
 descriptions as they relate to Python.
@@ -43,18 +44,20 @@ import linecache
 import inspect
 
 from inspect import *
-from itertools import chain
 from functools import partial
 
 from hy import repr
-from hy.reader import read_many
-from hy.compiler import hy_compile
+from hy.reader import read, read_many
 from hy.models import Expression, Lazy
+
+from beautifhy.reader import HyReader, HySafeReader
 
 from multimethod import multimethod
 
-from pygments.lexers import HyLexer
-from pygments.token import Token
+# It would be better to subclass HyReader to a HySafeReader,
+# to avoid this dependency
+#from pygments.lexers import HyLexer
+#from pygments.token import Token
 
 
 def ismultimethod(object):
@@ -187,11 +190,16 @@ def findsource(object):
             return (lines, lnum)
         elif isclass(object):
             try:
-                # _ClassFinder no longer in python 3.13,
-                # but findsource works directly.
-                # This breaks compat with <= 3.12,
-                # but removes need to use the reader.
-                return inspect.findsource(object)
+                # _ClassFinder not in python 3.13, but findsource works directly
+                if sys.version_info <= (3, 12):
+                    qualname = object.__qualname__
+                    source = ''.join(lines)
+                    hst = read_many(source, filename=file, skip_shebang=True, reader=HySafeReader())
+                    pst = hy_compile(hst, module, filename=file, source=source)
+                    class_finder = inspect._ClassFinder(qualname)
+                    return class_finder.visit(pst)
+                else:
+                    return inspect.findsource(object)
             except (inspect.ClassFoundException,) as e:
                 return (lines, e.args[0])
         elif ismultimethod(object):
@@ -269,24 +277,36 @@ def getcomments(object):
         # Non-Hy object
         return inspect.getcomments(object)
 
-def unsafe_getsourcelines(object):
+def getsource(object):
+    """Return the text of the source code for an object.
+
+    The argument may be a module, class, method, function, traceback, frame,
+    or code object.  The source code is returned as a single string.  An
+    OSError is raised if the source code cannot be retrieved."""
+    lines, lnum = getsourcelines(object)
+    return ''.join(lines)
+
+def hy_getblock(lines):
+    """Extract the lines of code corresponding to the first Hy form from the given list of lines."""
+    # Read the first form and use its attributes
+    form = read(''.join(lines), reader=HySafeReader())
+    return lines[:form.end_line]
+
+
+def getsourcelines(object):
     """Return a list of source lines and starting line number for a Hy or python object.
 
     First checks for Hy source, otherwise defers to the original `inspect.getsourcelines`.
 
-    The argument may be a module, class, method, function, traceback, frame,
-    or code object.  The source code is returned as a list of the lines
+    The argument may be a module, class, method, function, traceback, frame, or
+    code object. The source code is returned as a list of the lines
     corresponding to the object and the line number indicates where in the
-    original source file the first line of code was found.  An OSError is
+    original source file the first line of code was found. An OSError is
     raised if the source code cannot be retrieved.
 
-    **WARNING**
-    This function involves applying the Hy reader and compiling Hy code, which
-    executes any code defined in reader macros. This could trigger arbitrary
-    code execution when inspecting untrusted objects. Consider this fact before
-    using this function. This is necessary to guarantee correct identification of
-    source lines with reader macros.
-    If you want safe execution, use `getsourcelines`.
+    This function involves applying a 'safe' subclassed Hy reader, which does
+    not execute any code defined in user-defined reader macros. This avoids
+    arbitrary code execution when inspecting untrusted objects.
     """
     object = inspect.unwrap(object)
     lines, lnum = findsource(object)
@@ -301,28 +321,15 @@ def unsafe_getsourcelines(object):
         return lines, 0
     # Everything but Hy classes already works with inspect. 
     # The inspect.getblock function relies on inspect.BlockFinder which
-    # assumes python tokenization. So deal with this as a special case.
+    # assumes python tokenization.
+    # So deal with this as a special case.
     elif getfile(object).endswith('.hy'):
-        # Read the first form that was found using inspect.findsource.
-        form = next(read_many(''.join(lines[lnum:]), filename=getfile(object), skip_shebang=True))
-        # Pretty-print it so it looks like the source, dropping the '
-        source = repr(form)[1:]
-        # TODO check 0-base vs 1-based indexing here
-        return source, lnum + 1
+        return hy_getblock(lines[lnum:]), lnum + 1
     else:
         # Non-Hy object
         return inspect.getblock(lines[lnum:]), lnum + 1
 
-def getsource(object):
-    """Return the text of the source code for an object.
-
-    The argument may be a module, class, method, function, traceback, frame,
-    or code object.  The source code is returned as a single string.  An
-    OSError is raised if the source code cannot be retrieved."""
-    lines, lnum = getsourcelines(object)
-    return ''.join(lines)
-
-def getsourcelines(object):
+def lexer_getsourcelines(object):
     """Return a list of source lines and starting line number for a Hy or python object.
 
     Operates on Hy source, otherwise defers to python's `inspect.getsourcelines`.
@@ -333,9 +340,11 @@ def getsourcelines(object):
     original source file the first line of code was found.  An OSError is
     raised if the source code cannot be retrieved.
 
-    Uses lexical analysis only and does not execute reader macros or compile code.
-    If you need accurate identification of source lines including reader macros,
-    use `unsafe_getsourcelines`.
+    This function uses lexical analysis only and does not execute reader macros
+    or compile code. It may not work correctly in cases where reader macros
+    alter the syntax in some specific ways. If you need accurate identification
+    of source lines that includes such reader macros, use
+    `unsafe_getsourcelines`.
     """
     object = inspect.unwrap(object)
     lines, lnum = findsource(object)
