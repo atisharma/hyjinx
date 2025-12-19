@@ -26,8 +26,8 @@ First-class support for both Hy and Python is provided.
                         getmodule getcomments getsource getsourcefile])
 (import beautifhy.beautify [grind])
 (import beautifhy.highlight [hylight])
-(import beautifhy.repl [HyREPL :as REPL])
 
+(import hy.repl)
 (import hyjinx.lib [slurp])
 
 
@@ -152,7 +152,7 @@ First-class support for both Hy and Python is provided.
         filename caller-frame.f-code.co-filename
         lang (_get-lang-from-filename filename)
         module (get caller-frame.f-globals "__name__")
-        repl (REPL :locals caller-frame.f-locals)]
+        repl (hy.repl.REPL :locals caller-frame.f-locals)]
     ;; give the nested REPL an extended prompt by setting sys.ps*
     (setv old-ps1 sys.ps1
           old-ps2 sys.ps2
@@ -166,7 +166,7 @@ File {Effect.BOLD}{filename}, line {lineno}{Color.OFF}")
         (setv sys.ps1 old-ps1
               sys.ps2 old-ps2)))))
     
-;; This is redundant now with hy-repl, but kept for now as it is a Hy implementation.
+;; This is redundant now with hy-fancy-repl, but kept for now as it is a Hy implementation.
 (defn _exception-hook [exc-type exc-value tb *
                        [bg "dark"]
                        [limit 5]
