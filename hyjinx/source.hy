@@ -21,9 +21,9 @@ First-class support for both Hy and Python is provided.
 (import pygments.formatters [TerminalFormatter])
 (import colorist [Color BrightColor Effect])
 
-(import hyjinx.inspect [currentframe stack
-                        ismodule findsource isbuiltin ismethod isfunction
-                        getmodule getcomments getsource getsourcefile])
+(import hyjinx.hjx-inspect [currentframe stack
+                            ismodule findsource isbuiltin ismethod isfunction
+                            getmodule getcomments getsource getsourcefile])
 (import beautifhy.beautify [grind])
 (import beautifhy.highlight [hylight])
 

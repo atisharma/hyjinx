@@ -1,8 +1,11 @@
-## 🦑 Hyjinx
+## 🦑 Hyjinx 🔬
 
 *Functions and macros useful for modern living in the [Hy](http://hylang.org) REPL.*
 
-Compatible with Hy>=1.0
+Compatible with Hy>=1.2.0
+
+Hyjinx is a chaotic kitchen sink of useful things that have nothing to do with each other.
+When a module stabilises, it gets spun out into its own package.
 
 
 ### Hylights
@@ -10,7 +13,7 @@ Compatible with Hy>=1.0
 - A sensible, lispy `defmethod` (polymorphic type dispatch)
 - ~~A Hy code beautifier and in-REPL syntax highlighting~~ -- now moved to [beautifhy](https://github.com/atisharma/beautifhy)
 - ~~Pretty tracebacks with correct syntax highlighting for hy or python~~ -- now moved to [beautifhy](https://github.com/atisharma/beautifhy)
-- An `inspect` module that works like Python's, but also for Hy code
+- An `inspect` module that works like Python's, but also for Hy code (see https://github.com/hylang/hy/pull/2678)
 - Print/get/edit source code of a function, module etc.; e.g. `(print-source hyjinx.lib.sieve)`
 - In-repl code analysis and discussion using LLMs (e.g. for writing docstrings, code review)
 - In-repl syntax highlighting and latex rendering (for [sixel-capable terminals](https://www.arewesixelyet.com)) for LLM replies
