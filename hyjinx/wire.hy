@@ -12,14 +12,16 @@
 
 
 (setv sender-id (. (uuid1) hex))
-(setv HYJINX_PROTOCOL_VERSION "0.1.2")
+(setv HYJINX_PROTOCOL_VERSION "0.2.0")
 (setv rpcs {})
 
 
-(defn keys [config-file]
+(defn keys [config-file #^ str salt]
   "Return dict with public and private keys for use with wrap.
-  These are derived from the passphrase defined in `config-file`."
-  (let [keys (crypto.keys (:passphrase (config config-file)))]
+  These are derived from the passphrase defined in `config-file`.
+  The salt should be a random string."
+  (let [passphrase (:passphrase (config config-file))
+        keys (crypto.keys passphrase salt)]
     {"priv_key" (:private keys)
      "pub_key" (:public-pem keys)}))
 
@@ -47,6 +49,7 @@
     (except [UnpackException]
       (zerror :code "msgpack" :message "Failed to unpack message."))))
 
+;; TODO consider doing as a sumtype
 (defn zerror [message]
   {"error" {"code" code "message" message}})
 
