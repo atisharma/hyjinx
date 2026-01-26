@@ -33,6 +33,19 @@ Macros for Flow Control
 (import toolz [first second])
 
 
+;; * macros about modules
+;; ----------------------------------------------------
+
+(defmacro lazy-import [#* modules]
+  "Try to import a module (or modules), set it (them) to None if it fails."
+  ;; TODO expand this to the full import syntax
+  `(for [module modules]
+     (try
+       (import module)
+       (except [ImportError]
+         (setv module None)))))
+
+
 ;; * macros about macros
 ;; ----------------------------------------------------
 
@@ -76,7 +89,7 @@ Macros for Flow Control
   `(list (map ~@args)))
 
 
-;; * macros for functions
+;; * macros for functions / classes
 ;; ----------------------------------------------------
 
 (defmacro defmethod [#* args]
@@ -109,6 +122,23 @@ Macros for Flow Control
       `(defn [hy.I.multimethod.multimethod] ~f
          ~@body))))
 
+(defmacro defcontext [f #* body]
+  "Make a function a context manager.
+
+  Make function `f` a context manager using contextlib's
+  `contextmanager` decorator."
+  (if (= :async (first args))
+
+    (let [f (second args)
+          body (cut args 2 None)]
+      `(defn :async [hy.I.contextlib.asynccontextmanager] ~f
+         ~@body))
+
+    (let [f (first args)
+          body (cut args 1 None)]
+      `(defn [hy.I.contextlib.contextmanager] ~f
+         ~@body))))
+
 (defmacro defproperty [f #* body]
   "Class method definition using the property decorator.
 
@@ -121,23 +151,6 @@ Macros for Flow Control
     2`
   "
   `(defn [property] ~f [self] ~@body))
-  
-(defmacro defdataclass [c #* body]
-  "Dataclass definition using the dataclass decorator.
-
-  `(defdataclass c
-     #^ int x
-     #^ str s)`
-
-  is equivalent to the following Python code:
-
-  `@dataclass
-  class c:
-    x: int
-    s: str`
-  "
-  `(defclass [hy.I.dataclasses.dataclass] ~c []
-     ~@body))
 
 
 ;; * macros for pytest
@@ -173,16 +186,23 @@ Macros for Flow Control
   "Define an immutable dataclass using the dataclass decorator.
   For example, the Hy code
 
-  `(defdataclass D [#^ int x #^ float y])`
+  `(defstruct D
+     #^ int x
+     #^ str s)`
 
   is equivalent to the following Python code:
 
-  `@dataclass
+  `@dataclass(kwonly=True, slots=True, frozen=True)
   class D:
       x: int
-      y: float`
+      s: str`
   "
-  `(defclass [hy.I.dataclass.dataclass] ~d []
+  `(defclass
+     [(hy.I.dataclasses.dataclass
+        :frozen True
+        :slots True
+        :kwonly True)]
+     ~d []
      ~@body))
 
 
