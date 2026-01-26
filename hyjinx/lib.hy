@@ -33,6 +33,8 @@ See individual function docstrings for detailed information.
 (import os re unicodedata)
 (import sys [stdout])
 (import pathlib [Path])
+(import platformdirs [user-config-dir])
+(import collections [Iterable])
 
 (import ansi-escapes [ansiEscapes])
 
@@ -240,7 +242,25 @@ See individual function docstrings for detailed information.
     (lfor l (.split s "\n")
       :if (not (.startswith (.strip l) "```"))
       l)))
- 
+
+(defmethod camel-to-underscore [#^ str s]
+  "Turn camelCase string to underscore_style."
+  (let [out (.lower (first s))]
+    (setv prev out)
+    (for [c (rest s)]
+      (if (and (.isupper c) (not (.isupper prev)))
+        (+= out "_" (.lower c))
+        (+= out (.lower c)))
+      (setv prev c))
+    out))
+
+(defmethod camel-to-underscore [#^ (of Iterable dict) records]
+  "For every key in every dict in records,
+  turn the camelCase string to underscore_style."
+  (lfor record records
+    (dfor [k v] (record.items)
+      (camel-to-underscore k) v)))
+
 
 ;; * Numeric
 ;; ----------------------------------------------------
@@ -251,6 +271,14 @@ See individual function docstrings for detailed information.
   (try
     (float x)
     (except [] NaN)))
+
+(defn isnumeric [x]
+  "True iff `x` can be converted to float (including NaN)."
+  (try
+    (float x)
+    True
+    (except [[ValueError TypeError]]
+      False)))
 
 (defn sign [x]
   "+1 for x>=0 (if x is positive semidefinite), -1 for x<0 (negative definite)."
@@ -534,3 +562,22 @@ See individual function docstrings for detailed information.
 (defn short-id [x [n 6]]
   "First n (6) chars of hash-id."
   (cut (hash-id x) n))
+
+
+;; * Databases
+;; -----------------------------------------------------------------------------
+
+(defn db-url [db * [file None]]
+  "Form RFC-1738 database URL from a database name and TOML file (as a keyword).
+  
+  The TOML file should have a section named the same as the value of `db`
+  and define `db_type`, `user`, `password`, `server` and `port`.
+  This is typically for use with SQLAlchemy.
+  "
+  (let [cfg (config file)]
+    (+ (get cfg db "db_type") "://"
+       (get cfg db "user") ":"
+       (get cfg db "password") "@"
+       (get cfg db "server") ":"
+       (str (get cfg db "port")) "/" db)))
+
