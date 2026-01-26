@@ -34,7 +34,7 @@ See individual function docstrings for detailed information.
 (import sys [stdout])
 (import pathlib [Path])
 (import platformdirs [user-config-dir])
-(import collections [Iterable])
+(import collections.abc [Iterable])
 
 (import ansi-escapes [ansiEscapes])
 
