@@ -1,8 +1,8 @@
 "
 Actor model implementation using asyncio for concurrency.
 
-This module provides a lightweight, async actor framework where each actor receives 
-messages sequentially from an asyncio.Queue, ensuring async-safe, isolated execution 
+This module provides a lightweight, async actor framework where each actor receives
+messages sequentially from an asyncio.Queue, ensuring async-safe, isolated execution
 without explicit locks. It is not thread-safe.
 
 Key features:
@@ -12,12 +12,15 @@ Key features:
 - Lifecycle management via `start()`/`stop()` and async context manager support.
 - Automatic task tracking and graceful shutdown.
 
-Use `defactor` to quickly define stateless actor classes. Avoid `await` in `recv` 
+Use `defactor` to quickly define stateless actor classes. Avoid `await` in `recv`
 if strict message ordering is required.
 
 Example:
-    (defactor Greeter [#^str name] (print f\"Hello, {name}!\"))
-    (with [:async actor (Greeter)] (await (.send actor \"Alice\")))
+    (defactor Greeter [#^str name]
+      (print f\"Hello, {name}!\"))
+
+    (with [:async actor (Greeter)]
+      (await (.send actor \"Alice\")))
 "
 
 
@@ -49,7 +52,7 @@ Example:
     "Start the actor, initializing pseudo background event loop."
     (when self._started
       (raise (RuntimeError "Actor is already started")))
-    
+
     (try
       (setv self._started True)
       (.clear self._stop-event)
@@ -106,26 +109,26 @@ Example:
                         (task.exception)
                         (except [asyncio.CancelledError]
                           :cancelled))]
-      
+
         (if reply-future
           ;; ask: propagate result or exception to the waiting caller
           (cond
             (= exception :cancelled)
             (when (not (reply-future.done))
               (.cancel reply-future))
-            
+
             exception
             (.set_exception reply-future exception)
-            
+
             True
             (.set_result reply-future (task.result)))
-        
+
           ;; send: log exceptions but don't propagate
           (when (and exception (!= exception :cancelled))
             (self._logger.debug f"Handler raised exception in actor task {task}" :exc-info True))))
             ;(import traceback sys)
             ;(traceback.print-exception (type exception) exception (. exception __traceback__) :file sys.stderr))))
-    
+
       (except [asyncio.InvalidStateError]) ; Future already resolved/cancelled
       (except [e [Exception]]
         ;; Catch any unexpected errors in the callback itself
@@ -144,15 +147,15 @@ Example:
     "Shut down the actor.
     Wait for all running tasks to complete."
     (self._verify-started)
-    
+
     ;; Signal stop, reject new tasks
     (setv self._started False)
     (self._stop-event.set)
-    
+
     ;; Wait for background task
     (when self._bg-task
       (await self._bg-task))
-    
+
     ;; After _bg-task completes, all drain tasks are already started
     ;; take a locked snapshot before await
     (with [:async self._tasks-lock]
@@ -178,7 +181,7 @@ Example:
                 "queue_empty" (self._queue.empty)}
      "health" {"queue_full" (self._queue.full)
                "background_task_alive" (and self._bg-task
-                                            (not (self._bg-task.done)))}}) 
+                                            (not (self._bg-task.done)))}})
 
   (defn :async __aenter__ [self]
     (self.start))
@@ -189,7 +192,7 @@ Example:
 
   (defn :async [abstractmethod] recv [self message]
     "Process a message sent to the actor.
-    
+
     This method must be implemented by subclasses. It is called for each
     message received via `send` or `ask`. Return the response value for `ask`
     requests; raise exceptions to signal errors. For `send`, returned values
@@ -201,7 +204,7 @@ Example:
 
   (defn :async #^ None send [self message]
     "Send a message to the actor asynchronously (fire-and-forget).
-    
+
     The caller does not wait for or receive any response. Exceptions in the
     message handler are logged but not propagated. Message processing order is
     preserved only if `recv` does not yield control (i.e. no `await` calls)."
@@ -210,7 +213,7 @@ Example:
 
   (defn :async #^ T ask [self message]
     "Send a message and asynchronously wait for a reply.
-    
+
     Implements request-reply: returns the handler's return value,
     or raises any exception it raised. Safe to use with `await`.
     Message processing order is not preserved if `recv` contains `await`."
@@ -221,7 +224,7 @@ Example:
 
 (defmacro defactor [a args #* body]
   "Sugar to define a stateless `Actor` subclass.
-  
+
   This macro creates an Actor subclass where the message is destructured and
   passed directly to the handler. It should not be used to maintain
   per-instance mutable state, otherwise race conditions will occur.
@@ -237,7 +240,7 @@ Example:
     (.start p)
     (await (.send p \"a string\")
     (await (.stop p))
-  
+
     Or,
 
     (with [:async p (Printer)]
@@ -248,4 +251,3 @@ Example:
      (defclass ~a [Actor]
        (defn :async recv [self ~@args]
          ~@body))))
-  
