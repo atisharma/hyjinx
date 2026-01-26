@@ -80,7 +80,7 @@ Example usage:
 
 (import hyrule [pformat])
 (import hyjinx.lib [first last hash-color spit filetype jload jsave])
-(import hyjinx.inspect [getsource])
+(import hyjinx.hjx-inspect [getsource])
 (import hyjinx.source [get-source-details])
 (import pygments)
 (import pygments [highlight])
@@ -91,7 +91,7 @@ Example usage:
 (import types [ModuleType FunctionType MethodType TracebackType])
 (import itertools [tee])
 (import json.decoder [JSONDecodeError])
-(import colorist [BrightColor Color Effect])
+(import colorist [BrightColor Color])
 
 
 (try
