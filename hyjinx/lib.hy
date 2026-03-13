@@ -18,9 +18,12 @@ See individual function docstrings for detailed information.
 "
 
 (require hyrule [unless -> ->> as->]
-         hyjinx.macros *)
+         hyjinx.macros *
+         hyjinx.result [try-result let-result match-result result->])
 
 (require hyjinx.macros [lmap])
+
+(import hyjinx.result [ok err ok? err? result? unwrap unwrap-or map-ok collect-results])
 
 (import hy [mangle])
 (import functools *
@@ -397,6 +400,22 @@ See individual function docstrings for detailed information.
     (with [o (f fname #** kwargs)]
       (o.read))))
 
+(defn slurp-result [fname #** kwargs]
+  "Read a file and return a Result.
+  Returns ok(content) on success.
+  Returns err('file-not-found', ...) if the file does not exist.
+  Returns err('permission-error', ...) if access is denied.
+  Returns err('io-error', ...) for other OS-level failures.
+  kwargs are forwarded to open()."
+  (try
+    (ok (slurp fname #** kwargs))
+    (except [e FileNotFoundError]
+      (err "file-not-found" (str e) {"path" fname}))
+    (except [e PermissionError]
+      (err "permission-error" (str e) {"path" fname}))
+    (except [e OSError]
+      (err "io-error" (str e) {"path" fname}))))
+
 (defn spit [fname content * [mode "w"] #** kwargs]
   "Write content as file fname.
   kwargs can include mode, encoding and buffering, and will be passed
@@ -452,24 +471,34 @@ See individual function docstrings for detailed information.
 
 ;; TODO json-repair seems better; try it out
 (defn extract-json [text]
-  "Extract anything vaguely like { ... } or [ ... ] from a string."
+  "Extract anything vaguely like { ... } or [ ... ] from a string.
+
+  Returns a Result:
+    ok(dict)  — JSON object successfully parsed
+    ok(list)  — JSON array successfully parsed
+    err('no-json-found', ...)     — no JSON-like content in text
+    err('json-decode-error', ...) — found JSON-like content but parse failed
+
+  Previously this returned {} silently on all failure paths, masking
+  the distinction between 'no JSON present' and 'malformed JSON'.
+  Callers should use match-result or ok?/err? to handle both cases."
   (let [jobj (re.search "{.*}" text re.DOTALL)
         jarr (re.search r"\[.*\]" text re.DOTALL)]
     (cond
       (and jobj (jobj.group))
       (try
-        (hy.I.json.loads (jobj.group))
-        (except [err [hy.I.json.JSONDecodeError]]
-          {}))
+        (ok (hy.I.json.loads (jobj.group)))
+        (except [e hy.I.json.JSONDecodeError]
+          (err "json-decode-error" (str e) {"fragment" (cut (jobj.group) 80)})))
 
       (and jarr (jarr.group))
       (try
-        (hy.I.json.loads (jarr.group))
-        (except [err [hy.I.json.JSONDecodeError]]
-          []))
+        (ok (hy.I.json.loads (jarr.group)))
+        (except [e hy.I.json.JSONDecodeError]
+          (err "json-decode-error" (str e) {"fragment" (cut (jarr.group) 80)})))
 
       :else
-      {})))
+      (err "no-json-found" "No JSON object or array found in text" {"text_preview" (cut (str text) 80)}))))
 
 (defn jload [fname * [encoding "utf-8"]]
   "Read a json file. Return None if it doesn't exist."
@@ -479,6 +508,26 @@ See individual function docstrings for detailed information.
                      :mode "r"
                      :encoding encoding)]
         (hy.I.json.load f)))))
+
+(defn jload-result [fname * [encoding "utf-8"]]
+  "Read a JSON file and return a Result.
+  Returns ok(data) on success.
+  Returns err('file-not-found', ...) if the file does not exist.
+  Returns err('json-decode-error', ...) if the file contains invalid JSON.
+  Returns err('io-error', ...) for other OS-level failures.
+
+  Prefer this over jload when callers need to distinguish missing file
+  from malformed JSON, or when composing with result-> pipelines."
+  (let [path (Path fname)]
+    (if (not (path.exists))
+      (err "file-not-found" f"File not found: {fname}" {"path" fname})
+      (try
+        (with [f (open fname :mode "r" :encoding encoding)]
+          (ok (hy.I.json.load f)))
+        (except [e hy.I.json.JSONDecodeError]
+          (err "json-decode-error" (str e) {"path" fname}))
+        (except [e OSError]
+          (err "io-error" (str e) {"path" fname}))))))
 
 (defn jsave [obj fname * [encoding "utf-8"]]
   "Write an object as a json file."

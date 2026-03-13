@@ -201,7 +201,7 @@ Macros for Flow Control
      [(hy.I.dataclasses.dataclass
         :frozen True
         :slots True
-        :kwonly True)]
+        :kw-only True)]
      ~d []
      ~@body))
 

@@ -31,9 +31,49 @@ When a module stabilises, it gets spun out into its own package.
 - hyjinx.doc: peruse hy documentation.
 - hyjinx.actors: the async `Actor` class and `defactor` macro
 - hyjinx.screen: a convenient ncurses wrapper.
+- hyjinx.result: data-oriented Result type for explicit error handling.
 - hyjinx.mat: numpy pretty-printing for humans. (requires numpy, jax optional)
 - hyjinx.[zmq_client, zmq_server, crypto, wire]: lazy-pirate zmq RPC architecture. (requires zmq, ecdsa, zstandard, msgpack)
 - hyjinx.llm: discuss code with a Large Language Model (AI). TabbyAPI, OpenAI-compatible and Claude are supported. (requires `openai` and `anthropic` packages.)
+
+
+### Error handling
+
+`hyjinx.result` provides a lightweight Result type following Hickey's data-oriented
+philosophy and Duffy's two-error-kinds model.
+
+Results are plain dicts — observable, serialisable, composable:
+
+```hy
+(require hyjinx.result [result-> let-result match-result try-result])
+(import hyjinx.result [ok err ok? err? unwrap unwrap-or])
+
+;; Construct
+(ok 42)            ; => {"ok" True, "value" 42}
+(err "not-found" "File missing" {"path" fname})
+
+;; Thread a pipeline, short-circuiting on first failure
+(result-> raw-string
+          parse-int          ; str -> Result[int]
+          (validate-range 0 100)
+          (* 2))             ; plain return is wrapped in ok automatically
+
+;; Bind and propagate
+(let-result [n (parse-int s)]
+  (let-result [v (validate n)]
+    (ok (* v 2))))
+
+;; Bridge exception-throwing code at known fallible boundaries only
+(try-result (json.loads text))   ; => ok(parsed) or err("JSONDecodeError", ...)
+```
+
+Three refactored functions in `hyjinx.lib` demonstrate the integration:
+
+| Function | Change |
+|---|---|
+| `extract-json` | Returns `ok(dict\|list)` or `err(...)` instead of silently returning `{}` |
+| `slurp-result` | Like `slurp` but returns `ok(content)` or `err("file-not-found"\|"io-error", ...)` |
+| `jload-result` | Like `jload` but returns a Result, distinguishing missing file from malformed JSON |
 
 
 ### Install
