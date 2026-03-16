@@ -46,6 +46,12 @@ dev = ["pytest", "ecdsa", "pyzmq", "zstandard", "msgpack", "openai", "anthropic"
 [project.urls]
 Repository = "https://github.com/atisharma/hyjinx"
 
+[tool.pytest.ini_options]
+python_files = ["test_*.py", "*_test.py", "test_*.hy", "*_test.hy"]
+python_functions = ["test_*"]
+python_classes = ["Test*"]
+addopts = ["-p", "no:assertion", "-p", "no:faulthandler"]
+
 [tool.setuptools.dynamic]
 readme = {file = "README.md", content-type = "text/markdown"}
 version = {attr = "hyjinx.__version__"}
