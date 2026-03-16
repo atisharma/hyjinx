@@ -12,6 +12,10 @@ Starts the socket on import.
 (import hyjinx.lib [config])
 
 
+;; TODO: Consider using Result type for proper error handling in RPC calls
+;; instead of returning None on timeout. This would allow callers to distinguish
+;; between timeout, connection error, and application-level errors.
+
 (setv _context (zmq.Context))
 
 (setv _conf (config "client.toml")

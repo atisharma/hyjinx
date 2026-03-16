@@ -192,7 +192,7 @@ Macros for Flow Control
 
   is equivalent to the following Python code:
 
-  `@dataclass(kwonly=True, slots=True, frozen=True)
+  `@dataclass(kw_only=True, slots=True, frozen=True)
   class D:
       x: int
       s: str`
@@ -201,7 +201,7 @@ Macros for Flow Control
      [(hy.I.dataclasses.dataclass
         :frozen True
         :slots True
-        :kwonly True)]
+        :kw_only True)]
      ~d []
      ~@body))
 
