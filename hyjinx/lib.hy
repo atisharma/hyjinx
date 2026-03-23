@@ -17,7 +17,7 @@ It includes functions for:
 See individual function docstrings for detailed information.
 "
 
-(require hyrule [unless -> ->> as->]
+(require hyrule [unless -> ->> as-> of]
          hyjinx.macros *
          hyjinx.result [try-result let-result match-result result->])
 
