@@ -16,6 +16,10 @@ Starts the socket on import.
 (import hyjinx.wire [wrap unwrap zerror])
 
 
+;; TODO: Consider using Result type for proper error handling in RPC responses
+;; instead of raising exceptions. This would allow callers to pattern match
+;; on success/failure without exception handling overhead.
+
 (setv SendError (Exception "Message (reply) send failed.")
       ServerError (Exception))
 

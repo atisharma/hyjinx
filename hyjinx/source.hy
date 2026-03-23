@@ -8,7 +8,7 @@ First-class support for both Hy and Python is provided.
 (require hyjinx.macros [defmethod lmap])
 
 (import hyrule [inc dec pformat])
-(import hyjinx.lib [first second last])
+(import toolz [first second last])
 
 (import multimethod [multimethod])
 (import functools [partial])
