@@ -11,6 +11,10 @@
 (import hyjinx.lib [config hash-id])
 
 
+;; TODO: Consider implementing proper Result type returns for error handling
+;; instead of using zerror dict. This would allow callers to use result->
+;; threading and pattern matching on errors.
+
 (setv sender-id (. (uuid1) hex))
 (setv HYJINX_PROTOCOL_VERSION "0.2.0")
 (setv rpcs {})

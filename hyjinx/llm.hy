@@ -79,7 +79,8 @@ Example usage:
 (require hyjinx.macros [defmethod rest lmap])
 
 (import hyrule [pformat])
-(import hyjinx.lib [first last hash-color spit filetype jload jsave])
+(import hyjinx.lib [hash-color spit filetype jload jsave])
+(import toolz [first second last])
 (import hyjinx.hjx-inspect [getsource])
 (import hyjinx.source [get-source-details])
 (import pygments)
