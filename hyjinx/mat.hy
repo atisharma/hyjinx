@@ -6,7 +6,8 @@ Convenience things for ndarrays, matrices and numerical data.
                  -> ->> as->])
 
 (import hyrule [inc dec])
-(import hyjinx [first last prod])
+(import hyjinx.lib [prod])
+(import toolz [first last])
 (import functools [reduce partial])
 
 (import numpy)
