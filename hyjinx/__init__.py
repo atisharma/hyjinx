@@ -27,6 +27,32 @@ hyjinx.llm          - discuss code with a Large Language Model (AI). Anthropic, 
 
 import hy
 
+from toolz.itertoolz import rest
+
+from toolz import (
+    first,
+    second,
+    last,
+    take,
+    drop,
+    partition,
+    identity
+    )
+
+from functools import (
+    partial,
+    reduce,
+    cache
+    )
+
+from itertools import (
+    accumulate,
+    batched,
+    chain,
+    pairwise,
+    repeat
+    )
+
 # hyjinx.lib — convenience functions
 from hyjinx.lib import (
     # modules
@@ -153,5 +179,5 @@ hy.macros.require('hyjinx.macros', None, assignments='ALL', prefix='')
 
 # set the package version
 # the major.minor version simply match the assumed Hy version
-__version__ = "1.2.2"
+__version__ = "1.2.3"
 __version_info__ = __version__.split(".")
