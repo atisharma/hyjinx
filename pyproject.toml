@@ -27,6 +27,7 @@ classifiers = [
 dependencies = [
     "ansi-escapes",
     "beautifhy>=1.1.4",
+    "click",
     "colorist",
     "hy>=1.2.0",
     "hyrule",
@@ -37,6 +38,9 @@ dependencies = [
     "python-magic",
     "toolz"
 ]
+
+[project.scripts]
+hyjinx = "hyjinx.cli:main"
 
 [project.optional-dependencies]
 zmq = ["ecdsa", "pyzmq", "zstandard", "msgpack"]
