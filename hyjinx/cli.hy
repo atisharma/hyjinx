@@ -67,8 +67,8 @@ Commands:
   "Resolve a dotted symbol path to an object.
   
   Examples:
-    'agalmic.positions.db.get-position' 
-    -> import agalmic.positions.db, return get-position
+    'hyjinx.macros.defmethod' 
+    -> import hyjinx.macros, return defmethod macro
   "
   (let [parts (.split symbol-path ".")]
     (if (= (len parts) 1)
