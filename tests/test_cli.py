@@ -9,7 +9,7 @@ import sys
 def run_cli(*args):
     """Run the hyjinx CLI with given arguments."""
     result = subprocess.run(
-        ["/home/node/.openclaw/venvs/trading/bin/hyjinx"] + list(args),
+        [sys.executable, "-m", "hyjinx.cli"] + list(args),
         capture_output=True,
         text=True,
     )
