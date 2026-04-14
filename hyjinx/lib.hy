@@ -637,4 +637,3 @@ See individual function docstrings for detailed information.
        (get cfg db "password") "@"
        (get cfg db "server") ":"
        (str (get cfg db "port")) "/" db)))
-
