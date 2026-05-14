@@ -12,6 +12,7 @@ Commands:
 
 (import click)
 (import importlib)
+(import pathlib [Path])
 (import functools [reduce])
 (import hy [mangle])
 (import toolz [last])
@@ -22,6 +23,7 @@ Commands:
 (import multimethod [multimethod])
 (import hyjinx.source [print-source get-source-details _get-lang-from-filename])
 (import hyjinx.hjx-inspect [getsource getsourcefile])
+(import hyjinx.api [api-surface resolve-module-path format-surface])
 
 
 (defn get-source-details-safe [obj]
@@ -215,6 +217,34 @@ Commands:
       (raise (SystemExit 1)))))
 
 (cli.add-command doc)
+
+
+(defn [(click.command)
+       (click.argument "target")
+       (click.option "--params" :is-flag True :default True :help "Show parameter names")
+       (click.option "--line" :is-flag True :default False :help "Show line numbers")
+       (click.option "--kind" :type (click.Choice ["defn" "defclass" "defmacro" "setv" "def" "class"]) :multiple True :help "Filter by definition kind")]
+  api [target params line kind]
+  "Print the API surface of a module or file — no imports, no side effects.\n\nTARGET can be a file path (preferred) or a dotted module name.\nFile paths are safest as they never trigger module side effects.\nDotted names resolve via sys.path or importlib (may trigger imports)."
+  (let [path (if (.startswith target "/")
+                (Path target)
+                (resolve-module-path target))]
+    (when (is path None)
+      (click.echo f"Cannot resolve: {target}" :err True)
+      (raise (SystemExit 1)))
+    (when (not path.exists)
+      (click.echo f"File not found: {path}" :err True)
+      (raise (SystemExit 1)))
+    (let [defs (api-surface path)]
+      (when kind
+        (setv defs (lfor d defs :if (in (:kind d) kind) d)))
+      (if (not defs)
+        (click.echo f"No definitions found in {path}")
+        (do
+          (click.echo f"{(str path)}  [{(len defs)} definitions]")
+          (click.echo (format-surface defs :show-params params :show-line line)))))))
+
+(cli.add-command api)
 
 
 (defn main []
