@@ -1,5 +1,15 @@
-"A simple curses display class with context manager.
-You'll need to start the main using (.wrapper curses ...)."
+"""
+A simple ncurses display class with context manager support.
+
+Provides a `Screen` class that wraps curses for terminal-based UI.
+Start the main entry point with `.wrapper curses ...`.
+
+Features:
+  - Colour pair initialisation with default terminal colours
+  - Buffered message queues (warnings, errors, info, debug)
+  - Text input via embedded textbox
+  - Positioned string output with colour and style
+"""
 
 (require hyrule [unless -> ->>])
 

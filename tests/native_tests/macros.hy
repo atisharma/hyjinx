@@ -159,3 +159,44 @@ counter")]
   (setv n (+ n 1)))
 n")]
     (assert (= result 3))))
+
+
+;; ── defcontext ────────────────────────────────────────────────────────────────
+
+(defn test-defcontext-sync []
+  (let [result (hy-eval "
+(defcontext my-ctx [x]
+  (yield (* x 2)))
+(with [c (my-ctx 5)]
+  c)")]
+    (assert (= result 10))))
+
+(defn test-defcontext-async []
+  ;; Verify the :async variant produces an async context manager
+  (let [result (hy-eval "
+(import contextlib)
+(defcontext :async my-actx [x]
+  (yield (* x 3)))
+(isinstance (my-actx 4) contextlib._AsyncGeneratorContextManager)")]
+    (assert result)))
+
+(defn test-defcontext-is-contextmanager []
+  (let [result (hy-eval "
+(import contextlib)
+(defcontext ctest [v]
+  (yield v))
+(isinstance (ctest 1) contextlib._GeneratorContextManager)")]
+    (assert result)))
+
+(defn test-defcontext-cleanup-runs []
+  ;; After yield, cleanup code runs (contextmanager protocol)
+  ;; Use a list (mutable) so the generator can signal from inside
+  (let [result (hy-eval "
+(setv state [False])
+(defcontext cleanup-ctx []
+  (yield 42)
+  (setv (get state 0) True))
+(with [c (cleanup-ctx)]
+  c)
+(get state 0)")]
+    (assert result)))
