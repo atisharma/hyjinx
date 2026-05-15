@@ -19,6 +19,7 @@ This avoids triggering top-level code, DB connections, GPU init, etc.
 (import pathlib [Path])
 (import sys)
 (import toolz [first last])
+(import hyrule [inc])
 
 
 ;; * Internal: Hy form extraction
@@ -32,12 +33,28 @@ This avoids triggering top-level code, DB connections, GPU init, etc.
         (let [s (str p)]
           (.append names
             (cond
+              ;; These branches are currently dead code: the Hy reader
+              ;; expands #* -> (unpack-iterable ...) and #** -> (unpack-mapping ...)
+              ;; before we see them. Kept as defensive fallback.
               (= s "#*")  "*args"
               (= s "#**") "**kwargs"
               True       (unmangle s))))
 
         (and (isinstance p List) p (isinstance (first p) Symbol))
         (.append names (unmangle (str (first p))))
+
+        (isinstance p Expression)
+        ;; Handle (unpack-iterable args) from #* and (unpack-mapping kwargs) from #**
+        (when (>= (len p) 2)
+          (let [head (get p 0)]
+            (when (and (isinstance head Symbol) (in (str head) ["unpack-iterable" "unpack-mapping"]))
+              (let [op (str head)
+                    inner (get p 1)]
+                (.append names
+                  (cond
+                    (= op "unpack-iterable") (if (isinstance inner Symbol) (unmangle (str inner)) "*args")
+                    (= op "unpack-mapping")   (if (isinstance inner Symbol) (unmangle (str inner)) "**kwargs")
+                    True                       "??"))))))
 
         True
         None))
@@ -49,15 +66,15 @@ This avoids triggering top-level code, DB connections, GPU init, etc.
     ;; skip :async keyword
     (when (and (< idx (len form))
                (isinstance (get form idx) Keyword))
-      (setv idx (+ idx 1)))
+      (setv idx (inc idx)))
     ;; skip decorator list
     (when (and (< idx (len form))
                (isinstance (get form idx) List))
-      (setv idx (+ idx 1)))
-    (when (>= (+ idx 1) (len form))
+      (setv idx (inc idx)))
+    (when (>= (inc idx) (len form))
       (return None))
     (let [name-sym (get form idx)
-          params-form (get form (+ idx 1))]
+          params-form (get form (inc idx))]
       (when (not (isinstance name-sym Symbol))
         (return None))
       {"kind" "defn"
@@ -111,12 +128,13 @@ This avoids triggering top-level code, DB connections, GPU init, etc.
         (_parse-defmacro form)
 
         (= head-str "defclass")
-        (let [name-sym (get form 1 None)]
-          (when (isinstance name-sym Symbol)
-            {"kind" "defclass"
-             "name" (unmangle (str name-sym))
-             "params" []
-             "line" (or form.start-line 1)}))
+        (when (> (len form) 1)
+          (let [name-sym (get form 1)]
+            (when (isinstance name-sym Symbol)
+              {"kind" "defclass"
+               "name" (unmangle (str name-sym))
+               "params" []
+               "line" (or form.start-line 1)})))
 
         (= head-str "setv")
         (_parse-setv form)
@@ -151,12 +169,12 @@ This avoids triggering top-level code, DB connections, GPU init, etc.
 
         (isinstance node ast.Assign)
         (for [t node.targets]
-          (when (and (isinstance t ast.Name)
-                     (not (.startswith t.name "_")))
-            (.append results {"kind" "setv"
-                              "name" t.name
-                              "params" []
-                              "line" node.lineno})))
+          (when (isinstance t ast.Name)
+            (when (not (.startswith t.id "_"))
+              (.append results {"kind" "setv"
+                                "name" t.id
+                                "params" []
+                                "line" node.lineno}))))
 
         True
         None))
@@ -173,7 +191,7 @@ This avoids triggering top-level code, DB connections, GPU init, etc.
         source (.read-text p)]
     (cond
       (.endswith p.suffix ".hy")
-      (let [forms (list (read-many source))
+      (let [forms (list (read-many source :skip-shebang True))
             results []]
         (for [f forms]
           (let [defn (_parse-hy-form f)]

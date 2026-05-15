@@ -221,13 +221,22 @@ Commands:
 
 (defn [(click.command)
        (click.argument "target")
-       (click.option "--params" :is-flag True :default True :help "Show parameter names")
+       (click.option "--params/--no-params" :default True :help "Show parameter names")
        (click.option "--line" :is-flag True :default False :help "Show line numbers")
        (click.option "--kind" :type (click.Choice ["defn" "defclass" "defmacro" "setv" "def" "class"]) :multiple True :help "Filter by definition kind")]
   dir-cmd [target params line kind]
   "List the API surface of a module or file — no imports, no side effects.\n\nLike Python's dir(), but static. TARGET can be a file path (preferred)\nor a dotted module name. File paths are safest as they never trigger\nmodule side effects. Dotted names resolve via sys.path or importlib\n(may trigger imports)."
-  (let [path (if (.startswith target "/")
+  (let [path (cond
+                ;; Absolute path
+                (.startswith target "/")
                 (Path target)
+
+                ;; Relative path with extension (exists on disk)
+                (and (in "." target) (.exists (Path target)))
+                (Path target)
+
+                ;; Dotted module name
+                True
                 (resolve-module-path target))]
     (when (is path None)
       (click.echo f"Cannot resolve: {target}" :err True)
