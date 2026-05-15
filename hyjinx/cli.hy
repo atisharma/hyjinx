@@ -12,6 +12,7 @@ Commands:
 
 (import click)
 (import importlib)
+(import pathlib [Path])
 (import functools [reduce])
 (import hy [mangle])
 (import toolz [last])
@@ -22,6 +23,7 @@ Commands:
 (import multimethod [multimethod])
 (import hyjinx.source [print-source get-source-details _get-lang-from-filename])
 (import hyjinx.hjx-inspect [getsource getsourcefile])
+(import hyjinx.api [api-surface resolve-module-path format-surface])
 
 
 (defn get-source-details-safe [obj]
@@ -33,43 +35,45 @@ Commands:
       (cond
         ;; Module
         (ismodule obj)
-          (if (hasattr obj "__file__")
-            {"line" 1
-             "module" (getattr obj "__name__" "unknown")
-             "file" obj.__file__
-             "language" (_get-lang-from-filename obj.__file__)
-             "extension" (last (.split obj.__file__ "."))}
-            None)
-        ;; Multimethod
-        (isinstance obj multimethod)
-          (let [module-name (getattr obj "__module__" None)
-                obj-name (getattr obj "__name__" "unknown")]
-            (if module-name
-              (let [module (importlib.import-module module-name)]
-                {"line" 1
-                 "module" module-name
-                 "file" module.__file__
-                 "language" (_get-lang-from-filename module.__file__)
-                 "extension" (last (.split module.__file__ "."))})
-              None))
-        ;; Other object with __file__
-        (hasattr obj "__file__")
+        (if (hasattr obj "__file__")
           {"line" 1
            "module" (getattr obj "__name__" "unknown")
            "file" obj.__file__
            "language" (_get-lang-from-filename obj.__file__)
            "extension" (last (.split obj.__file__ "."))}
+          None)
+
+        ;; Multimethod
+        (isinstance obj multimethod)
+        (let [module-name (getattr obj "__module__" None)
+              obj-name (getattr obj "__name__" "unknown")]
+          (if module-name
+            (let [module (importlib.import-module module-name)]
+              {"line" 1
+               "module" module-name
+               "file" module.__file__
+               "language" (_get-lang-from-filename module.__file__)
+               "extension" (last (.split module.__file__ "."))})
+            None))
+
+        ;; Other object with __file__
+        (hasattr obj "__file__")
+        {"line" 1
+         "module" (getattr obj "__name__" "unknown")
+         "file" obj.__file__
+         "language" (_get-lang-from-filename obj.__file__)
+         "extension" (last (.split obj.__file__ "."))}
+
         ;; Give up
         True
-          None))))
+        None))))
 
 (defn resolve-symbol [symbol-path]
   "Resolve a dotted symbol path to an object.
-  
+
   Examples:
-    'hyjinx.macros.defmethod' 
-    -> import hyjinx.macros, return defmethod macro
-  "
+    'hyjinx.macros.defmethod'
+    -> import hyjinx.macros, return defmethod macro"
   (let [parts (.split symbol-path ".")]
     (if (= (len parts) 1)
       ;; Just a module name
@@ -82,16 +86,14 @@ Commands:
         (for [i (range (len parts) 0 -1)]
           (let [module-path (.join "." (cut parts 0 i))]
             (try
-              (do
-                (importlib.import-module module-path)
-                (setv module-idx i)
-                (break))
-              (except [ImportError]
-                None))))
-        
+              (importlib.import-module module-path)
+              (setv module-idx i)
+              (break)
+              (except [ImportError]))))
+
         (when (is module-idx None)
           (raise (ImportError f"Cannot import any module from {symbol-path}")))
-        
+
         ;; Import the module and walk the attribute chain
         (let [module-path (.join "." (cut parts 0 module-idx))
               module (importlib.import-module module-path)
@@ -215,6 +217,43 @@ Commands:
       (raise (SystemExit 1)))))
 
 (cli.add-command doc)
+
+
+(defn [(click.command)
+       (click.argument "target")
+       (click.option "--params/--no-params" :default True :help "Show parameter names")
+       (click.option "--line" :is-flag True :default False :help "Show line numbers")
+       (click.option "--kind" :type (click.Choice ["defn" "defclass" "defmacro" "setv" "def" "class"]) :multiple True :help "Filter by definition kind")]
+  dir-cmd [target params line kind]
+  "List the API surface of a module or file — no imports, no side effects.\n\nLike Python's dir(), but static. TARGET can be a file path (preferred)\nor a dotted module name. File paths are safest as they never trigger\nmodule side effects. Dotted names resolve via sys.path or importlib\n(may trigger imports)."
+  (let [path (cond
+                ;; Absolute path
+                (.startswith target "/")
+                (Path target)
+
+                ;; Relative path with extension (exists on disk)
+                (and (in "." target) (.exists (Path target)))
+                (Path target)
+
+                ;; Dotted module name
+                True
+                (resolve-module-path target))]
+    (when (is path None)
+      (click.echo f"Cannot resolve: {target}" :err True)
+      (raise (SystemExit 1)))
+    (when (not path.exists)
+      (click.echo f"File not found: {path}" :err True)
+      (raise (SystemExit 1)))
+    (let [defs (api-surface path)]
+      (when kind
+        (setv defs (lfor d defs :if (in (:kind d) kind) d)))
+      (if (not defs)
+        (click.echo f"No definitions found in {path}")
+        (do
+          (click.echo f"{(str path)}  [{(len defs)} definitions]")
+          (click.echo (format-surface defs :show-params params :show-line line)))))))
+
+(cli.add-command dir-cmd :name "dir")
 
 
 (defn main []
