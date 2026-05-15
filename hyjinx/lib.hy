@@ -62,16 +62,12 @@ See individual function docstrings for detailed information.
     coroutine
     (asyncio.get-event-loop)))
 
-;; FIXME doesn't work
-(defn :async coroutine [f [process False] #* args #** kwargs]
-  "Decorator to run a synchronous function in an executor.
-  Defaults to `ThreadPoolExecutor`, more suitable for IO-bound tasks,
-  otherwise when `process` is `True`, uses `ProcessPoolExecutor`, for CPU-bound tasks.
-  Remember that the GIL exists."
-  (import asyncio [get-event-loop])
-  (import concurrent.futures [ProcessPoolExecutor ThreadPoolExecutor])
-  (with [executor (if process (ProcessPoolExecutor) (ThreadPoolExecutor))]
-    (await (.run-in-executor (get-event-loop) executor f #* args #** kwargs)))) 
+(defn :async coroutine [f #* args #** kwargs]
+  "Run a synchronous function in a thread executor.
+  A convenience wrapper around `asyncio.to-thread`.
+  The function `f` is called with `args` and `kwargs` in a thread pool."
+  (import asyncio)
+  (await (asyncio.to-thread f #* args #** kwargs))) 
 
 
 ;; * Functions

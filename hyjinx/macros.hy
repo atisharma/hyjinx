@@ -123,21 +123,17 @@ Macros for Flow Control
          ~@body))))
 
 (defmacro defcontext [f #* body]
-  "Make a function a context manager.
-
-  Make function `f` a context manager using contextlib's
+  "Make a function a context manager using contextlib's
   `contextmanager` decorator."
-  (if (= :async (first args))
+  (if (= :async f)
 
-    (let [f (second args)
-          body (cut args 2 None)]
-      `(defn :async [hy.I.contextlib.asynccontextmanager] ~f
-         ~@body))
+    (let [fname (first body)
+          fbody (cut body 1 None)]
+      `(defn :async [hy.I.contextlib.asynccontextmanager] ~fname
+         ~@fbody))
 
-    (let [f (first args)
-          body (cut args 1 None)]
-      `(defn [hy.I.contextlib.contextmanager] ~f
-         ~@body))))
+    `(defn [hy.I.contextlib.contextmanager] ~f
+       ~@body)))
 
 (defmacro defproperty [f #* body]
   "Class method definition using the property decorator.
