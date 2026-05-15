@@ -225,3 +225,25 @@ Tests for hyjinx.lib — the utility function library.
     (assert (get r "ok"))
     (let [data (unwrap r)]
       (assert (= (get (get data "a") "b") [1 2])))))
+
+
+;; ── coroutine ────────────────────────────────────────────────────────────────
+
+(import asyncio)
+
+(defn test-coroutine-runs-sync-in-thread []
+  (let [result (asyncio.run (hyjinx.lib.coroutine (fn [] 42)))]
+    (assert (= result 42))))
+
+(defn test-coroutine-with-args []
+  (let [result (asyncio.run (hyjinx.lib.coroutine (fn [x y] (+ x y)) 3 4))]
+    (assert (= result 7))))
+
+(defn test-coroutine-with-kwargs []
+  (let [result (asyncio.run (hyjinx.lib.coroutine (fn [x [y 10]] (+ x y)) 5 :y 20))]
+    (assert (= result 25))))
+
+(defn test-coroutine-blocking-io []
+  ;; Verify it actually runs in a thread (not blocking the event loop)
+  (let [result (asyncio.run (hyjinx.lib.coroutine (fn [] (import time) (time.sleep 0.01) "done")))]
+    (assert (= result "done"))))
