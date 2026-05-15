@@ -18,7 +18,7 @@ This avoids triggering top-level code, DB connections, GPU init, etc.
 (import ast)
 (import pathlib [Path])
 (import sys)
-(import toolz [first])
+(import toolz [first last])
 
 
 ;; * Internal: Hy form extraction
@@ -29,18 +29,18 @@ This avoids triggering top-level code, DB connections, GPU init, etc.
     (for [p params-form]
       (cond
         (isinstance p Symbol)
-          (let [s (str p)]
-            (.append names
-              (cond
-                (= s "#*")  "*args"
-                (= s "#**") "**kwargs"
-                True       (unmangle s))))
+        (let [s (str p)]
+          (.append names
+            (cond
+              (= s "#*")  "*args"
+              (= s "#**") "**kwargs"
+              True       (unmangle s))))
 
         (and (isinstance p List) p (isinstance (first p) Symbol))
-          (.append names (unmangle (str (first p))))
+        (.append names (unmangle (str (first p))))
 
         True
-          None))
+        None))
     names))
 
 (defn _parse-defn [form]
@@ -105,24 +105,24 @@ This avoids triggering top-level code, DB connections, GPU init, etc.
     (let [head-str (str head)]
       (cond
         (in head-str ["defn" "defn/a"])
-          (_parse-defn form)
+        (_parse-defn form)
 
         (= head-str "defmacro")
-          (_parse-defmacro form)
+        (_parse-defmacro form)
 
         (= head-str "defclass")
-          (let [name-sym (get form 1 None)]
-            (when (isinstance name-sym Symbol)
-              {"kind" "defclass"
-               "name" (unmangle (str name-sym))
-               "params" []
-               "line" (or form.start-line 1)}))
+        (let [name-sym (get form 1 None)]
+          (when (isinstance name-sym Symbol)
+            {"kind" "defclass"
+             "name" (unmangle (str name-sym))
+             "params" []
+             "line" (or form.start-line 1)}))
 
         (= head-str "setv")
-          (_parse-setv form)
+        (_parse-setv form)
 
         True
-          None))))
+        None))))
 
 
 ;; * Internal: Python AST extraction
@@ -141,25 +141,25 @@ This avoids triggering top-level code, DB connections, GPU init, etc.
     (for [node (ast.iter-child-nodes tree)]
       (cond
         (isinstance node (| ast.FunctionDef ast.AsyncFunctionDef))
-          (.append results (_parse-py-def node))
+        (.append results (_parse-py-def node))
 
         (isinstance node ast.ClassDef)
-          (.append results {"kind" "class"
-                            "name" node.name
-                            "params" []
-                            "line" node.lineno})
+        (.append results {"kind" "class"
+                          "name" node.name
+                          "params" []
+                          "line" node.lineno})
 
         (isinstance node ast.Assign)
-          (for [t node.targets]
-            (when (and (isinstance t ast.Name)
-                       (not (.startswith t.name "_")))
-              (.append results {"kind" "setv"
-                                "name" t.name
-                                "params" []
-                                "line" node.lineno})))
+        (for [t node.targets]
+          (when (and (isinstance t ast.Name)
+                     (not (.startswith t.name "_")))
+            (.append results {"kind" "setv"
+                              "name" t.name
+                              "params" []
+                              "line" node.lineno})))
 
         True
-          None))
+        None))
     results))
 
 
@@ -173,21 +173,21 @@ This avoids triggering top-level code, DB connections, GPU init, etc.
         source (.read-text p)]
     (cond
       (.endswith p.suffix ".hy")
-        (let [forms (list (read-many source))
-              results []]
-          (for [f forms]
-            (let [defn (_parse-hy-form f)]
-              (when defn
-                (if (isinstance defn list)
-                  (.extend results defn)
-                  (.append results defn)))))
-          results)
+      (let [forms (list (read-many source))
+            results []]
+        (for [f forms]
+          (let [defn (_parse-hy-form f)]
+            (when defn
+              (if (isinstance defn list)
+                (.extend results defn)
+                (.append results defn)))))
+        results)
 
       (.endswith p.suffix ".py")
-        (_parse-py-tree (ast.parse source :filename (str p)))
+      (_parse-py-tree (ast.parse source :filename (str p)))
 
       True
-        (raise (ValueError f"Unsupported file type: {p.suffix}")))))
+      (raise (ValueError f"Unsupported file type: {p.suffix}")))))
 
 (defn _find-spec-fallback [dotted-name]
   "Fallback module resolver using importlib.util.find-spec.
@@ -195,21 +195,16 @@ This avoids triggering top-level code, DB connections, GPU init, etc.
   (import importlib.util [find-spec])
   (try
     (let [spec (find-spec dotted-name)]
-      (if (and spec spec.origin)
+      (when (and spec spec.origin)
         (let [origin spec.origin
               hy-path (.with-suffix (Path (.replace origin "__pycache__" "")) ".hy")]
           (if (.exists hy-path)
             hy-path
-            (if (.exists (Path origin))
-              (Path origin)
-              None)))
-        None))
-    (except [ImportError]
-      None)
-    (except [ModuleNotFoundError]
-      None)
-    (except [ValueError]
-      None)))
+            (when (.exists (Path origin))
+              (Path origin))))))
+    (except [ImportError])
+    (except [ModuleNotFoundError])
+    (except [ValueError])))
 
 (defn resolve-module-path [dotted-name]
   "Resolve a dotted module name to a source file path, without importing.
