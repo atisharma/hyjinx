@@ -61,8 +61,10 @@ This avoids triggering top-level code, DB connections, GPU init, etc.
     names))
 
 (defn _parse-defn [form]
-  "Parse a defn form, handling :async, decorators."
-  (let [idx 1]
+  "Parse a defn/defmethod form, handling :async, decorators."
+  (let [head (get form 0)
+        kind (if (= (str head) "defmethod") "defmethod" "defn")
+        idx 1]
     ;; skip :async keyword
     (when (and (< idx (len form))
                (isinstance (get form idx) Keyword))
@@ -77,7 +79,7 @@ This avoids triggering top-level code, DB connections, GPU init, etc.
           params-form (get form (inc idx))]
       (when (not (isinstance name-sym Symbol))
         (return None))
-      {"kind" "defn"
+      {"kind" kind
        "name" (unmangle (str name-sym))
        "params" (if (isinstance params-form List)
                     (_extract-params params-form)
@@ -121,7 +123,7 @@ This avoids triggering top-level code, DB connections, GPU init, etc.
       (return None))
     (let [head-str (str head)]
       (cond
-        (in head-str ["defn" "defn/a"])
+        (in head-str ["defn" "defn/a" "defmethod"])
         (_parse-defn form)
 
         (= head-str "defmacro")
@@ -266,6 +268,7 @@ This avoids triggering top-level code, DB connections, GPU init, etc.
 (defn format-surface [defs * [show-params True] [show-line False]]
   "Format a list of definition dicts as a readable table."
   (let [kind-tags {"defn" "defn"
+                   "defmethod" "meth"
                    "def" "def "
                    "defclass" "cls "
                    "class" "cls "
