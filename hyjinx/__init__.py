@@ -13,6 +13,7 @@ hyjinx.doc          - peruse hy documentation.
 hyjinx.actors       - a convenient asyncio agent model
 hyjinx.screen       - a convenient ncurses wrapper.
 hyjinx.result       - Result type for explicit error handling.
+hyjinx.debug        - Hy-aware pdb debugger with macro support.
 
 (depends on numpy and/or jax)
 hyjinx.mat          - numpy pretty-printing for humans.
@@ -157,6 +158,12 @@ from hyjinx.result import (
     map_ok,
     map_err,
     collect_results,
+)
+
+# hyjinx.debug — Hy-aware debugger
+from hyjinx.debug import (
+    HyPdb,
+    set_trace,
 )
 
 # hyjinx.call_graph — static call-graph extraction
