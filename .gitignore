@@ -22,3 +22,6 @@ publish.sh
 *.log
 
 REVIEW.md
+SPEC.md
+PLAN.md
+AGENTS.md

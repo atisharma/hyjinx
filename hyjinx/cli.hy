@@ -24,6 +24,7 @@ Commands:
 (import hyjinx.source [print-source get-source-details _get-lang-from-filename])
 (import hyjinx.hjx-inspect [getsource getsourcefile])
 (import hyjinx.api [api-surface resolve-module-path format-surface])
+(import hyjinx.call-graph [call-graph callers callees transitive-callers transitive-callees dead-code])
 
 
 (defn get-source-details-safe [obj]
@@ -254,6 +255,79 @@ Commands:
           (click.echo (format-surface defs :show-params params :show-line line)))))))
 
 (cli.add-command dir-cmd :name "dir")
+
+
+(defn [(click.command)
+       (click.argument "target")
+       (click.option "--json" :is-flag True :help "Output as JSON")
+       (click.option "--dead" :is-flag True :help "Show unreachable definitions")
+       (click.option "--callers-of" :default None :help "Show callers of this function")
+       (click.option "--callees-of" :default None :help "Show callees of this function")
+       (click.option "--path" :nargs 2 :default None :help "Find call path from SOURCE to TARGET")
+       (click.option "--warnings" :is-flag True :help "Show only warnings/errors")
+       (click.option "--safe" :is-flag True :help "Use HySafeReader (default macros only, zero side effects)")]
+  graph [target json dead callers-of callees-of path warnings safe]
+  "Extract and analyse the call graph of a module or file.\
+\
+Static analysis — no imports, no side effects. Shows definitions,\
+call edges, imports, and supports reachability analysis."
+  (let [g (call-graph target :safe safe)]
+    (when warnings
+      (if g.warnings
+        (do
+          (for [w g.warnings]
+            (click.echo w :err True))
+          (raise (SystemExit 1)))
+        (do
+          (click.echo "No warnings")
+          (return))))
+    (if json
+      (click.echo (hy.I.json.dumps
+        (hy.I.dataclasses.asdict g)
+        :indent 2
+        :default str))
+      (do
+        (click.echo f"File:    {g.file}")
+        (click.echo f"Language: {g.language}")
+        (click.echo f"Definitions: {(len g.definitions)}")
+        (click.echo f"Call edges: {(len g.calls)}")
+        (click.echo f"Imports:  {(len g.imports)}")
+        (when g.warnings
+          (for [w g.warnings]
+            (click.echo f"Warning:  {w}")))
+        (when path
+          (let [[source target] path]
+            (let [sep " -> "
+                  cp (call-path g source target)]
+              (if cp
+                (click.echo f"Path from {source} to {target}: {(.join sep cp)}")
+                (click.echo f"No path from {source} to {target}")))))
+        (when dead
+          (let [dc (dead-code g)]
+            (if dc
+              (do
+                (click.echo f"Dead code ({(len dc)} definitions):")
+                (for [d dc]
+                  (click.echo f"  - {d}")))
+              (click.echo "No dead code found"))))
+        (when callers-of
+          (let [result (callers g callers-of)]
+            (if result
+              (do
+                (click.echo f"Callers of {callers-of}:")
+                (for [c result]
+                  (click.echo f"  - {c}")))
+              (click.echo f"No callers of {callers-of}"))))
+        (when callees-of
+          (let [result (callees g callees-of)]
+            (if result
+              (do
+                (click.echo f"Callees of {callees-of}:")
+                (for [c result]
+                  (click.echo f"  - {c}")))
+              (click.echo f"No callees of {callees-of}"))))))))
+
+(cli.add-command graph :name "graph")
 
 
 (defn main []

@@ -159,6 +159,18 @@ from hyjinx.result import (
     collect_results,
 )
 
+# hyjinx.call_graph — static call-graph extraction
+from hyjinx.call_graph import (
+    call_graph,
+    callers,
+    callees,
+    transitive_callers,
+    transitive_callees,
+    dead_code,
+    reachable,
+    call_path,
+)
+
 # numpy may not be installed
 try:
     from hyjinx.mat import (
