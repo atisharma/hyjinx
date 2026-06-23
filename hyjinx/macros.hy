@@ -53,12 +53,52 @@ Macros for Flow Control
   "Delete / unregister a macro."
   `(eval-when-compile
      (del (get _hy_macros (hy.mangle macro)))))
-  
+
 (defmacro help-macro [macro]
   "Get help for a macro.
   Use like (help-macro 'help-macro)."
   `(help (get-macro ~macro)))
-  
+
+(defmacro spy [expr]
+  "Evaluate expr, print 'expr => value', return value."
+  `(let [result# ~expr]
+     (print f"{(hy.repr '~expr)} => {(hy.repr result#)}")
+     result#))
+
+(defmacro step-trace [form]
+  "Capture macro expansion steps at compile time, display at runtime."
+
+  ;; capture all steps at compile time
+  (setv steps [])
+  (setv current form)
+  (setv step-num 0)
+
+  (while True
+    (.append steps (hy.repr current))
+    (setv expanded (hy.macroexpand-1 current __name__))
+    (if (= expanded current)
+      (break)
+      (do
+        (setv current expanded)
+        (+= step-num 1)
+        (when (> step-num 20)
+          (.append steps "(step limit reached)")
+          (break)))))
+
+  ;; build print statements manually;
+  ;; each step becomes a literal print statement
+  (setv print-statements
+    (lfor [i s] (enumerate steps)
+      ;; Create (print "Step i: s") as a literal
+      `(print ~(+ "Step " (str i) ": " s))))
+
+  ;; generate the final code
+  `(do
+     (print "\n=== Step Trace ===")
+     ~@print-statements
+     (print f"Final: {(hy.repr '~current)}")
+     ~current))
+
 
 ;; * macros for sequences
 ;; ----------------------------------------------------
@@ -67,11 +107,11 @@ Macros for Flow Control
   "A slice of all but the first element of a sequence."
   ;; consider toolz.itertoolz.rest
   `(cut ~xs 1 None))
-  
+
 (defmacro butlast [xs]
   "A slice of all but the last element of a sequence."
   `(cut ~xs 0 -1))
-  
+
 (defmacro .. [start end [step 1]]
   "A realised (eager) range, [start end) (i.e. excluding right boundary)."
   `(list (range ~start ~end ~step)))
@@ -164,7 +204,7 @@ Macros for Flow Control
     2`
   "
   `(defn [hy.I.pytest.fixture] ~f [] ~@body))
-  
+
 (defmacro def-numeric-test [test-name f x ans]
   "Return a function that makes a numeric comparison (using
   `numpy.isclose`) of function f applied to x to ans, where the result
@@ -172,7 +212,7 @@ Macros for Flow Control
   ans for all elements. This is convenient for writing tests with
   pytest."
   `(defn ~test-name [~x]
-     (assert (hy.I.numpy.isclose (~f ~x) ~ans)))) 
+     (assert (hy.I.numpy.isclose (~f ~x) ~ans))))
 
 
 ;; * macros for data structures
